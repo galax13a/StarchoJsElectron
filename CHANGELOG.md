@@ -8,7 +8,10 @@
 - Comando portable `npm run check` para validar la sintaxis JavaScript.
 - Pipeline CI con pruebas, auditoría npm, CodeQL y Dependabot.
 - Recuperación del PIN olvidado mediante la contraseña de la cuenta, con textos en Español/Inglés.
-- El bloqueo configurado vuelve a solicitar acceso después de reiniciar la aplicación.
+- El lock queda opt-in: solo aparece al pulsar el icono de bloqueo; reiniciar no bloquea el dashboard.
+- Login y registro con timeout, mensajes localizados y recuperación segura ante errores de arranque.
+- El login permanece visible hasta que el dashboard termina de renderizarse correctamente.
+- Dashboard con render inmediato, carga tolerante a API lenta y protección contra renders obsoletos.
 - ESLint, Prettier, Husky, rate limiting, hash de sesiones y builds multiplataforma automatizados.
 
 ## 2.0.0 — 2026-08-10
