@@ -14,7 +14,12 @@
     "start:production": "cross-env NODE_ENV=production electron .",
     "test": "node --test",
     "check": "node scripts/verify.mjs",
-    "ci": "npm run check && npm test && npm audit --omit=dev --audit-level=high",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write scripts/verify.mjs test/**/*.js src/renderer/utils/fatalScreen.js .github/**/*.yml",
+    "format:check": "prettier --check scripts/verify.mjs test/**/*.js src/renderer/utils/fatalScreen.js .github/**/*.yml",
+    "ci": "npm run check && npm run lint && npm run format:check && npm test && npm audit --omit=dev --audit-level=high",
+    "prepare": "husky",
     "build": "electron-builder",
     "build:win": "electron-builder --win --config.win.signExecutable=false",
     "build:linux": "electron-builder --linux",
@@ -26,11 +31,13 @@
     "appId": "com.starcho.js",
     "productName": "Starcho JS",
     "copyright": "Copyright © 2026 Starcho JS",
-    "asar": false,
+    "asar": true,
+    "asarUnpack": ["node_modules/better-sqlite3/**"],
     "directories": {
       "output": "dist",
       "buildResources": "assets"
     },
+    "artifactName": "Starcho-JS-${version}-${os}-${arch}.${ext}",
     "files": [
       "main.js",
       "preload.js",
@@ -112,7 +119,10 @@
     "@electron/rebuild": "^4.2.0",
     "cross-env": "^10.1.0",
     "electron": "43.3.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.8.1",
+    "husky": "^9.1.7",
+    "prettier": "^3.9.6"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

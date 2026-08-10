@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -47,8 +48,19 @@ test('API requires a session and isolates the authenticated notes flow', async (
     });
     assert.equal(loggedIn.response.status, 200);
     assert.ok(loggedIn.data.token);
+    const storedSession = require('../src/backend/database/connection')
+      .getDb()
+      .prepare('SELECT token FROM app_sessions WHERE username = ?')
+      .get(username);
+    assert.equal(
+      storedSession.token,
+      crypto.createHash('sha256').update(loggedIn.data.token).digest('hex'),
+    );
+    assert.notEqual(storedSession.token, loggedIn.data.token);
 
-    const queryToken = await json(`/api/auth/validate?token=${encodeURIComponent(loggedIn.data.token)}`);
+    const queryToken = await json(
+      `/api/auth/validate?token=${encodeURIComponent(loggedIn.data.token)}`,
+    );
     assert.equal(queryToken.response.status, 401);
 
     const authHeaders = {
@@ -99,7 +111,11 @@ test('API requires a session and isolates the authenticated notes flow', async (
     const created = await json('/api/notes', {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({ title: 'Nota protegida', content: 'Contenido de prueba', username: 'otro-usuario' }),
+      body: JSON.stringify({
+        title: 'Nota protegida',
+        content: 'Contenido de prueba',
+        username: 'otro-usuario',
+      }),
     });
     assert.equal(created.response.status, 200);
     assert.equal(created.data.title, 'Nota protegida');
@@ -130,15 +146,48 @@ test('API requires a session and isolates the authenticated notes flow', async (
     const otherHeaders = { Authorization: `Bearer ${otherLogin.data.token}` };
     const otherList = await json('/api/notes', { headers: otherHeaders });
     assert.equal(otherList.response.status, 200);
-    assert.equal(otherList.data.some((note) => note.id === created.data.id), false);
+    assert.equal(
+      otherList.data.some((note) => note.id === created.data.id),
+      false,
+    );
 
     const otherRead = await json(`/api/notes/${created.data.id}`, { headers: otherHeaders });
     assert.equal(otherRead.response.status, 404);
 
-    const deleted = await json(`/api/notes/${created.data.id}`, { method: 'DELETE', headers: authHeaders });
+    const deleted = await json(`/api/notes/${created.data.id}`, {
+      method: 'DELETE',
+      headers: authHeaders,
+    });
     assert.equal(deleted.response.status, 200);
   } finally {
     await stopServer();
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test('login throttling and server shutdown are observable', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starcho-js-lifecycle-'));
+  let port;
+  try {
+    port = await startServer({ db: path.join(tempDir, 'test.db'), userData: tempDir }, 0);
+    const base = `http://127.0.0.1:${port}`;
+    const badLogin = () =>
+      fetch(`${base}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'missing-user', password: 'wrong-password' }),
+      });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      assert.equal((await badLogin()).status, 401);
+    }
+    assert.equal((await badLogin()).status, 429);
+  } finally {
+    await stopServer();
+  }
+
+  await assert.rejects(
+    fetch(`http://127.0.0.1:${port}/ping`),
+    /fetch failed|ECONNREFUSED|network/i,
+  );
+  fs.rmSync(tempDir, { recursive: true, force: true });
 });

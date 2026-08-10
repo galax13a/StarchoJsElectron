@@ -37,6 +37,9 @@ function runMigrations(db) {
       expires_at INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE INDEX IF NOT EXISTS idx_app_sessions_username ON app_sessions(username);
+    CREATE INDEX IF NOT EXISTS idx_app_sessions_expires_at ON app_sessions(expires_at);
   `);
 
   // ── Idempotent column additions ────────────────────────────────────────────
@@ -81,9 +84,8 @@ function runMigrations(db) {
   const upsert = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
   defaults.forEach(([k, v]) => upsert.run(k, v));
 
-  // Seed demo user
-  db.prepare('INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)')
-    .run('demo@starcho.com', hashPassword('123456'));
+  // Do not seed a known demo credential. The local account is created lazily
+  // from APP_USER/APP_PASSWORD by the authentication route.
 
   log.info('Core database migrations complete');
 }

@@ -40,7 +40,9 @@ function ensureOverlay() {
       showFatalError(error, { retry: action });
     }
   });
-  overlay.querySelector('#fatal-error-reload').addEventListener('click', () => window.location.reload());
+  overlay
+    .querySelector('#fatal-error-reload')
+    .addEventListener('click', () => window.location.reload());
   overlay.querySelector('#fatal-error-exit').addEventListener('click', () => {
     if (window.electronAPI?.close) window.electronAPI.close();
     else window.close();
@@ -54,7 +56,9 @@ export function showFatalError(error, { retry = null } = {}) {
   root.querySelector('#fatal-error-title').textContent = t('fatal_title');
   root.querySelector('#fatal-error-message').textContent = t('fatal_message');
   root.querySelector('#fatal-error-details-label').textContent = t('fatal_details');
-  root.querySelector('#fatal-error-details').textContent = escapeText(error?.stack || error?.message || error);
+  root.querySelector('#fatal-error-details').textContent = escapeText(
+    error?.stack || error?.message || error,
+  );
   root.querySelector('#fatal-error-retry').textContent = t('retry');
   root.querySelector('#fatal-error-reload').textContent = t('reload_app');
   root.querySelector('#fatal-error-exit').textContent = t('exit_app');

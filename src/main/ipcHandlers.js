@@ -7,6 +7,7 @@ const { getDb } = require('../backend/database/connection');
 const log = require('electron-log');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const crypto = require('crypto');
 
 let authSessionPath = null;
@@ -14,10 +15,11 @@ let authSessionPath = null;
 function isTrustedSender(event) {
   const win = getMainWindow();
   const frameUrl = event?.senderFrame?.url || '';
+  const allowedUrl = pathToFileURL(path.join(__dirname, '..', 'renderer', 'index.html')).href;
   return Boolean(
     win && !win.isDestroyed() &&
     event?.sender === win.webContents &&
-    frameUrl.startsWith('file://'),
+    (frameUrl === allowedUrl || frameUrl.startsWith(`${allowedUrl}#`)),
   );
 }
 
@@ -102,9 +104,10 @@ function registerIpcHandlers(appPaths, serverPort) {
 
   ipcMain.handle('data:create-backup', async (event, language) => {
     requireTrustedSender(event);
+    const lang = language === 'en' ? 'en' : 'es';
     const defaultName = `starcho-backup-${new Date().toISOString().slice(0, 10)}.db`;
     const result = await dialog.showSaveDialog(getMainWindow(), {
-      title: language === 'en' ? 'Create backup' : 'Guardar copia de seguridad',
+      title: lang === 'en' ? 'Create backup' : 'Guardar copia de seguridad',
       defaultPath: path.join(appPaths.userData, defaultName),
       filters: [{ name: 'Base de datos SQLite', extensions: ['db'] }],
     });

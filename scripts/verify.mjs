@@ -20,7 +20,11 @@ const files = collect(root).sort();
 const failures = [];
 for (const file of files) {
   const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
-  if (result.status !== 0) failures.push({ file: relative(root, file), output: `${result.stdout || ''}${result.stderr || ''}`.trim() });
+  if (result.status !== 0)
+    failures.push({
+      file: relative(root, file),
+      output: `${result.stdout || ''}${result.stderr || ''}`.trim(),
+    });
 }
 
 if (failures.length) {

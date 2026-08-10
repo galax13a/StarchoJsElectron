@@ -157,26 +157,17 @@
   wireToggle('lp-toggle-pw',  'lp-password',  'lp-eye-icon');
   wireToggle('reg-toggle-pw', 'reg-password', 'reg-eye-icon');
 
-  function fallbackSession() {
-    try { return JSON.parse(localStorage.getItem('auth_session') || 'null'); } catch (_) { return null; }
-  }
+  function fallbackSession() { return null; }
   function readStoredSession() {
     if (!window.electronAPI?.getAuthSession) return Promise.resolve(fallbackSession());
     return window.electronAPI.getAuthSession().then(function (session) { return session || fallbackSession(); }).catch(function () { return fallbackSession(); });
   }
   function saveStoredSession(session) {
     localStorage.removeItem('auth_session');
-    if (!window.electronAPI?.setAuthSession) {
-      localStorage.setItem('auth_session', JSON.stringify(session));
-      return Promise.resolve(true);
-    }
+    if (!window.electronAPI?.setAuthSession) return Promise.resolve(false);
     return window.electronAPI.setAuthSession(session).then(function (saved) {
-      if (!saved) localStorage.setItem('auth_session', JSON.stringify(session));
       return saved;
-    }).catch(function () {
-      localStorage.setItem('auth_session', JSON.stringify(session));
-      return false;
-    });
+    }).catch(function () { return false; });
   }
   function clearStoredSession() {
     localStorage.removeItem('auth_session');
@@ -186,6 +177,8 @@
   // ── Auto-login via stored session token (7-day, no password stored) ─────────
   // Migrate old auth_remember (stored plaintext password) → remove it on first run
   localStorage.removeItem('auth_remember');
+  // Never keep bearer tokens in localStorage; use Electron safeStorage only.
+  localStorage.removeItem('auth_session');
 
   readStoredSession().then(function (storedSession) {
     if (storedSession && storedSession.expiresAt && Date.now() > storedSession.expiresAt) {

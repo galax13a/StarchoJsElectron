@@ -21,6 +21,10 @@ async function startServer(appPaths, preferredPort) {
   expressApp.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     next();
   });
   expressApp.use(cors({
@@ -66,7 +70,6 @@ async function startServer(appPaths, preferredPort) {
   expressApp.use('/admin', require('./admin/router'));
 
   // Global error handler — catches any unhandled throw from route handlers
-  // eslint-disable-next-line no-unused-vars
   expressApp.use((err, req, res, _next) => {
     log.error(`[API] 500 ${req.method} ${req.originalUrl}:`, err.message, err.stack);
     if (!res.headersSent) {

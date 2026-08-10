@@ -10,10 +10,7 @@ async function getSessionToken() {
       if (secureSession?.token) return secureSession.token;
     }
   } catch (_) {}
-  try {
-    const localSession = JSON.parse(localStorage.getItem('auth_session') || 'null');
-    return localSession?.token || null;
-  } catch (_) { return null; }
+  return null;
 }
 
 async function request(method, path, body) {
@@ -22,7 +19,18 @@ async function request(method, path, body) {
   if (token) headers.Authorization = `Bearer ${token}`;
   const options = { method, headers };
   if (body !== undefined) options.body = JSON.stringify(body);
-  const response = await fetch(`${BASE}/api${path}`, options);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  options.signal = controller.signal;
+  let response;
+  try {
+    response = await fetch(`${BASE}/api${path}`, options);
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('La solicitud tardó demasiado');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(data.error || `HTTP ${response.status}`);

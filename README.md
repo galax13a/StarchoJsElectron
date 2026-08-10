@@ -13,6 +13,8 @@ Starcho JS es una aplicación de notas de escritorio, rápida y local, construid
 - Interfaz en Español e Inglés.
 - Copias de seguridad SQLite desde Settings.
 - Mensajes de la aplicación centralizados para Español e Inglés, incluyendo notas, dashboard, perfil, logout y bloqueo.
+- Sesiones bearer almacenadas como hash, rate limiting de autenticación y sin tokens en `localStorage`.
+- Pantalla de recuperación ante fallos del renderer y cierre limpio del servidor local.
 - Arquitectura modular con el plugin oficial de notas.
 - Sin reproductor de YouTube, música, descargas multimedia ni biblioteca de medios.
 
@@ -37,6 +39,8 @@ npm run rebuild
 
 ```bash
 npm run check
+npm run lint
+npm run format:check
 npm test
 npm audit --omit=dev --audit-level=high
 ```
@@ -50,6 +54,8 @@ npm run ci
 ```
 
 GitHub Actions ejecuta automáticamente sintaxis, pruebas y auditoría en cada push o pull request. CodeQL analiza el código JavaScript y Dependabot revisa semanalmente las dependencias npm.
+
+El hook Husky de `pre-commit` ejecuta `npm run check` y `npm run lint` antes de crear un commit.
 
 ## Ejecutar en desarrollo
 
@@ -90,6 +96,8 @@ El build local de macOS requiere macOS para producir un artefacto confiable. Par
 | `npm start` | Inicia la aplicación Electron |
 | `npm run dev` | Inicia Electron en modo desarrollo |
 | `npm run check` | Valida la sintaxis JavaScript |
+| `npm run lint` | Revisa errores estáticos con ESLint |
+| `npm run format:check` | Comprueba el formato con Prettier |
 | `npm run ci` | Ejecuta validaciones, pruebas y auditoría |
 | `npm run rebuild` | Reconstruye dependencias nativas para Electron |
 | `npm run build` | Genera el instalador de la plataforma actual |

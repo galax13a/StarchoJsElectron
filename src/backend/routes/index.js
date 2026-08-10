@@ -14,12 +14,18 @@ const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const loginAttempts = new Map();
+const registerAttempts = new Map();
+
+function hashSessionToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 function createAppSession(username) {
   const db        = getDb();
   const token     = crypto.randomBytes(32).toString('hex');
   const expiresAt = Date.now() + SESSION_TTL;
-  db.prepare('INSERT OR REPLACE INTO app_sessions (token, username, expires_at) VALUES (?, ?, ?)').run(token, username, expiresAt);
+  db.prepare('INSERT OR REPLACE INTO app_sessions (token, username, expires_at) VALUES (?, ?, ?)')
+    .run(hashSessionToken(token), username, expiresAt);
   // Clean up expired sessions opportunistically
   db.prepare('DELETE FROM app_sessions WHERE expires_at < ?').run(Date.now());
   return { token, expiresAt };
@@ -28,12 +34,13 @@ function createAppSession(username) {
 function validateAppSession(token) {
   if (!token) return null;
   const db  = getDb();
-  const row = db.prepare('SELECT username FROM app_sessions WHERE token = ? AND expires_at > ?').get(token, Date.now());
+  const row = db.prepare('SELECT username FROM app_sessions WHERE token = ? AND expires_at > ?')
+    .get(hashSessionToken(token), Date.now());
   return row ? row.username : null;
 }
 
 function destroyAppSession(token) {
-  try { getDb().prepare('DELETE FROM app_sessions WHERE token = ?').run(token); } catch (_) {}
+  try { getDb().prepare('DELETE FROM app_sessions WHERE token = ?').run(hashSessionToken(token)); } catch (_) {}
 }
 
 function bearerToken(req) {
@@ -51,12 +58,15 @@ function requireAppSession(req, res, next) {
   next();
 }
 
-function loginRate(ip) {
+function rateRecord(map, ip) {
   const now = Date.now();
-  const record = loginAttempts.get(ip);
+  for (const [key, value] of map) {
+    if (now - value.startedAt >= LOGIN_WINDOW_MS) map.delete(key);
+  }
+  const record = map.get(ip);
   if (!record || now - record.startedAt >= LOGIN_WINDOW_MS) {
     const fresh = { startedAt: now, count: 0 };
-    loginAttempts.set(ip, fresh);
+    map.set(ip, fresh);
     return fresh;
   }
   return record;
@@ -72,7 +82,8 @@ function ensureDefaultUser(db) {
 
 router.post('/auth/login', validate(LoginSchema), (req, res) => {
   const { username, password } = req.body;
-  const attempt = loginRate(req.ip || '127.0.0.1');
+  const ip = req.ip || '127.0.0.1';
+  const attempt = rateRecord(loginAttempts, ip);
   res.set('Cache-Control', 'no-store');
   if (attempt.count >= LOGIN_MAX_ATTEMPTS) {
     return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
@@ -88,7 +99,7 @@ router.post('/auth/login', validate(LoginSchema), (req, res) => {
     if (isLegacyHash(user.password)) {
       db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashPassword(password), user.id);
     }
-    loginAttempts.delete(req.ip || '127.0.0.1');
+    loginAttempts.delete(ip);
     const { token, expiresAt } = createAppSession(user.username);
     res.json({ ok: true, username: user.username, token, expiresAt });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -110,13 +121,22 @@ router.get('/auth/validate', (req, res) => {
 
 router.post('/auth/register', validate(RegisterSchema), (req, res) => {
   const { username, password } = req.body;
+  const ip = req.ip || '127.0.0.1';
+  const attempt = rateRecord(registerAttempts, ip);
+  if (attempt.count >= LOGIN_MAX_ATTEMPTS) {
+    return res.status(429).json({ error: 'Demasiados registros. Espera 15 minutos.' });
+  }
   try {
     const db = getDb();
     if (db.prepare('SELECT id FROM users WHERE username = ?').get(username))
       return res.status(409).json({ error: 'Ese usuario ya existe' });
     db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hashPassword(password));
+    registerAttempts.delete(ip);
     res.json({ ok: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    attempt.count += 1;
+    res.status(500).json({ error: 'No se pudo crear la cuenta' });
+  }
 });
 
 router.get('/auth/profile', requireAppSession, (req, res) => {
