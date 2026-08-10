@@ -1205,6 +1205,7 @@ body {
 .app-lock-card p { color: var(--text-secondary); font-size: 13px; margin-bottom: 20px; }
 .app-lock-input { text-align: center; letter-spacing: .35em; margin-bottom: 12px; }
 .app-lock-card .btn { width: 100%; justify-content: center; }
+.app-lock-recover { margin-top: 8px; font-size: 12px; }
 .app-lock-error { min-height: 20px; margin-top: 12px; color: var(--red); font-size: 12px; }
 
 /* ── Shared component styles ───────────────────────────────────────────────── */

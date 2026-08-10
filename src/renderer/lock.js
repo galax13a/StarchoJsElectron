@@ -4,12 +4,18 @@ import { openModal, showToast } from './components/Modal.js';
 import { t } from './utils/i18n.js';
 
 let lockOverlay = null;
+let unlockMode = 'pin';
 
 function refreshOverlayText() {
   if (!lockOverlay) return;
+  const recovering = unlockMode === 'password-recovery';
   lockOverlay.querySelector('h2').textContent = t('lock_title');
-  lockOverlay.querySelector('#app-lock-message').textContent = t('locked_message');
-  lockOverlay.querySelector('button[type="submit"]').textContent = t('unlock');
+  lockOverlay.querySelector('#app-lock-message').textContent = t(recovering ? 'recovery_message' : 'locked_message');
+  lockOverlay.querySelector('button[type="submit"]').textContent = t(recovering ? 'recover_access' : 'unlock');
+  lockOverlay.querySelector('#app-lock-recover').textContent = t('recover_with_password');
+  lockOverlay.querySelector('#app-lock-recover').hidden = unlockMode !== 'pin';
+  lockOverlay.querySelector('#app-lock-back').textContent = t('back_to_pin');
+  lockOverlay.querySelector('#app-lock-back').hidden = !recovering;
 }
 
 function ensureOverlay() {
@@ -25,6 +31,8 @@ function ensureOverlay() {
       <input id="app-lock-input" class="form-control app-lock-input" type="password" autocomplete="off" inputmode="numeric">
       <button class="btn btn-primary" type="submit">${t('unlock')}</button>
     </form>
+    <button type="button" class="btn btn-ghost app-lock-recover" id="app-lock-recover"></button>
+    <button type="button" class="btn btn-ghost app-lock-recover" id="app-lock-back"></button>
     <div id="app-lock-error" class="app-lock-error" role="alert"></div>
   </div>`;
   document.body.appendChild(lockOverlay);
@@ -32,6 +40,8 @@ function ensureOverlay() {
     event.preventDefault();
     unlockApp().catch(() => showLockError(t('invalid_lock')));
   });
+  lockOverlay.querySelector('#app-lock-recover').addEventListener('click', () => setLocked(true, 'password-recovery'));
+  lockOverlay.querySelector('#app-lock-back').addEventListener('click', () => setLocked(true, 'pin'));
   refreshOverlayText();
   return lockOverlay;
 }
@@ -48,13 +58,14 @@ async function getConfig() {
 
 function setLocked(locked, mode = 'pin') {
   const overlay = ensureOverlay();
-  refreshOverlayText();
+  unlockMode = mode;
   const input = overlay.querySelector('#app-lock-input');
   input.value = '';
   input.type = mode === 'pin' ? 'password' : 'password';
   input.inputMode = mode === 'pin' ? 'numeric' : 'text';
   input.maxLength = mode === 'pin' ? 4 : 128;
   input.placeholder = mode === 'pin' ? t('enter_pin') : t('enter_password');
+  refreshOverlayText();
   overlay.classList.toggle('visible', locked);
   if (locked) setTimeout(() => input.focus(), 50);
 }
@@ -63,6 +74,22 @@ async function unlockApp() {
   const config = await getConfig();
   const input = lockOverlay.querySelector('#app-lock-input');
   const credential = input.value;
+  if (unlockMode === 'password-recovery') {
+    const username = store.state.loggedUser?.username;
+    if (!username || !credential) { showLockError(t('invalid_lock')); return; }
+    try {
+      await API.auth.login(username, credential);
+      await window.electronAPI.clearLockConfig();
+    } catch (_) {
+      showLockError(t('invalid_lock'));
+      input.select();
+      return;
+    }
+    showLockError('');
+    setLocked(false);
+    showToast(t('lock_recovered'), 'success');
+    return;
+  }
   if (config.mode === 'pin') {
     if (!/^\d{4}$/.test(credential)) { showLockError(t('invalid_pin')); return; }
     const valid = await window.electronAPI.verifyLockPin(credential);
@@ -84,7 +111,10 @@ function lockErrorMessage(error) {
 
 export async function initAppLock() {
   ensureOverlay();
-  await getConfig();
+  const config = await getConfig();
+  // A configured lock protects every new session, including after a restart.
+  // Password recovery remains available from the PIN screen.
+  if (config.configured) setLocked(true, config.mode);
 }
 
 export async function openAppLock() {
