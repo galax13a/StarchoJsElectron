@@ -1,0 +1,118 @@
+{
+  "name": "starcho-js",
+  "productName": "Starcho JS",
+  "version": "2.0.0",
+  "description": "Aplicación de notas de escritorio construida con Electron, Express 5 y SQLite.",
+  "main": "main.js",
+  "engines": {
+    "node": ">=24.19.0 <25"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "cross-env NODE_ENV=development electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.starcho.js",
+    "productName": "Starcho JS",
+    "copyright": "Copyright © 2026 Starcho JS",
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "plugins/**/*",
+      "assets/**/*",
+      "node_modules/**/*",
+      "!node_modules/.cache/**/*",
+      "!dist/**/*",
+      "!*.md"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icons/icon.png",
+      "publisherName": "Starcho JS"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg"
+        },
+        {
+          "target": "zip"
+        }
+      ],
+      "icon": "assets/icons/icon.icns",
+      "category": "public.app-category.productivity",
+      "darkModeSupport": true
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "assets/icons/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Starcho JS"
+    },
+    "dmg": {
+      "title": "Starcho JS Installer",
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "galax13a",
+      "repo": "StarchoJS",
+      "releaseType": "release"
+    }
+  },
+  "keywords": [
+    "notes",
+    "productivity",
+    "electron"
+  ],
+  "author": {
+    "name": "Starcho Dev",
+    "email": "botcamdev@gmail.com"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
+    "cross-env": "^10.1.0",
+    "electron": "43.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
+    "express": "^5.2.1",
+    "zod": "^4.4.3"
+  }
+}
