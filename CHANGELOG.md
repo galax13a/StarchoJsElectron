@@ -2,6 +2,7 @@
 
 ## Próxima versión
 
+- Mensajería activa revisada para mantener Español/Inglés en dashboard, notas, perfil, logout y bloqueo.
 - Copias de seguridad SQLite desde Settings mediante IPC seguro.
 - Suite de calidad ampliada para autenticación, perfil, avatar, preferencias y seguridad HTTP.
 - Comando portable `npm run check` para validar la sintaxis JavaScript.

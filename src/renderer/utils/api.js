@@ -42,6 +42,7 @@ const API = {
   setBase,
   config: { get: () => request('GET', '/config') },
   auth: {
+    login: (username, password) => request('POST', '/auth/login', { username, password }),
     getProfile: (username) => request('GET', `/auth/profile?username=${encodeURIComponent(username)}`),
     updateProfile: (data) => request('PUT', '/auth/profile', data),
   },

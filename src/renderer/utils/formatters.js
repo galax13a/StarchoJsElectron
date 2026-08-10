@@ -1,3 +1,5 @@
+import { t, getLang } from './i18n.js';
+
 export function formatDuration(seconds) {
   if (!seconds || isNaN(seconds)) return '0:00';
   const m = Math.floor(seconds / 60);
@@ -13,11 +15,12 @@ export function formatCount(n) {
 
 export function timeAgo(dateStr) {
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (diff < 60)      return 'Just now';
-  if (diff < 3600)    return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)   return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+  const suffix = getLang() === 'en' ? 'ago' : 'atrás';
+  if (diff < 60)      return getLang() === 'en' ? 'Just now' : 'Ahora mismo';
+  if (diff < 3600)    return `${Math.floor(diff / 60)}m ${suffix}`;
+  if (diff < 86400)   return `${Math.floor(diff / 3600)}h ${suffix}`;
+  if (diff < 2592000) return `${Math.floor(diff / 86400)}d ${suffix}`;
+  return new Date(dateStr).toLocaleDateString(getLang() === 'en' ? 'en-US' : 'es-ES');
 }
 
 export function truncate(str, len = 40) {
@@ -37,9 +40,9 @@ export function sanitizeHTML(str) {
  */
 export function greeting() {
   const h = new Date().getHours();
-  if (h < 12) return 'Buenos días';
-  if (h < 18) return 'Buenas tardes';
-  return 'Buenas noches';
+  if (h < 12) return t('good_morning');
+  if (h < 18) return t('good_afternoon');
+  return t('good_evening');
 }
 
 /**
@@ -47,7 +50,7 @@ export function greeting() {
  * (e.g. "viernes, 22 de mayo de 2026").
  */
 export function dateStr() {
-  return new Date().toLocaleDateString('es-ES', {
+  return new Date().toLocaleDateString(getLang() === 'en' ? 'en-US' : 'es-ES', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 }

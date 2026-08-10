@@ -12,6 +12,7 @@ Starcho JS es una aplicación de notas de escritorio, rápida y local, construid
 - Tema claro y oscuro.
 - Interfaz en Español e Inglés.
 - Copias de seguridad SQLite desde Settings.
+- Mensajes de la aplicación centralizados para Español e Inglés, incluyendo notas, dashboard, perfil, logout y bloqueo.
 - Arquitectura modular con el plugin oficial de notas.
 - Sin reproductor de YouTube, música, descargas multimedia ni biblioteca de medios.
 

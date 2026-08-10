@@ -16,8 +16,9 @@
 import store           from '../store.js';
 import EventBus        from '../utils/eventBus.js';
 import PluginRegistry  from '../core/PluginRegistry.js';
-import { openProfileModal } from './Modal.js';
+import { openModal, openProfileModal, showToast } from './Modal.js';
 import { t } from '../utils/i18n.js';
+import { openAppLock } from '../lock.js';
 
 const DEFAULT_AVATAR = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23333'/><circle cx='32' cy='24' r='12' fill='%23666'/><ellipse cx='32' cy='56' rx='20' ry='14' fill='%23666'/></svg>`;
 
@@ -146,7 +147,8 @@ function _html(s = {}) {
         <div class="sb-user-info">
           <div class="sb-nickname">${displayName}</div>
         </div>
-        <button class="sb-logout-icon-btn" id="btn-logout" title="Cerrar sesión">
+        <button class="sb-logout-icon-btn" id="btn-lock" title="${t('lock_app')}" aria-label="${t('lock_app')}">🔒</button>
+        <button class="sb-logout-icon-btn" id="btn-logout" title="${t('logout')}" aria-label="${t('logout')}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
@@ -173,7 +175,21 @@ function _bind(el) {
 
   el.querySelector('#btn-logout')?.addEventListener('click', (e) => {
     e.stopPropagation();
-    localStorage.removeItem('auth_remember');
-    location.reload();
+    openModal({
+      title: `🚪 ${t('logout_title')}`,
+      content: `<p class="modal-help">${t('logout_message')}</p>`,
+      actions: [
+        { label: t('cancel'), class: 'btn-secondary', action: (close) => close() },
+        { label: t('confirm_exit'), class: 'btn-danger', action: async (close) => {
+          localStorage.removeItem('auth_remember');
+          localStorage.removeItem('auth_session');
+          window.__starchoSessionToken = null;
+          try { await window.electronAPI?.clearAuthSession?.(); } catch (_) {}
+          close();
+          location.reload();
+        } },
+      ],
+    });
   });
+  el.querySelector('#btn-lock')?.addEventListener('click', (e) => { e.stopPropagation(); openAppLock().catch(() => showToast(t('invalid_lock'), 'error')); });
 }

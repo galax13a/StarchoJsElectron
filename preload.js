@@ -9,7 +9,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App info
   getVersion: () => ipcRenderer.invoke('app:get-version'),
   getPaths:   () => ipcRenderer.invoke('app:get-paths'),
-  createBackup: () => ipcRenderer.invoke('data:create-backup'),
+  createBackup: (language) => ipcRenderer.invoke('data:create-backup', language),
+  getLockConfig: () => ipcRenderer.invoke('lock:get-config'),
+  setLockConfig: (config) => ipcRenderer.invoke('lock:set-config', config),
+  verifyLockPin: (pin) => ipcRenderer.invoke('lock:verify-pin', pin),
+  clearLockConfig: () => ipcRenderer.invoke('lock:clear-config'),
 
   // App restart
   restart: () => ipcRenderer.send('app:restart'),

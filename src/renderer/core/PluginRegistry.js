@@ -7,6 +7,7 @@
  */
 import API      from '../utils/api.js';
 import EventBus from '../utils/eventBus.js';
+import { t }   from '../utils/i18n.js';
 
 const _plugins          = []; // loaded plugin manifests for UI queries
 const _navItems         = []; // { view, icon, label } from all plugins
@@ -101,12 +102,12 @@ const PluginRegistry = {
         await w.render(bodyEl);
       } catch (err) {
         console.warn(`[PluginRegistry] Widget "${w.id}" render error:`, err);
-        bodyEl.innerHTML = `<div class="dash-widget-empty">Error al cargar módulo</div>`;
+        bodyEl.innerHTML = `<div class="dash-widget-empty">${t('module_load_error')}</div>`;
       }
     }
 
     if (widgets.length === 0) {
-      container.innerHTML = `<div class="dash-widget-empty">Sin módulos activos en esta zona</div>`;
+      container.innerHTML = `<div class="dash-widget-empty">${t('no_active_modules')}</div>`;
     }
   },
 

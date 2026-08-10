@@ -14,14 +14,15 @@ import { esc, formGroup }
                   from '../../../../src/renderer/utils/html.js';
 import { viewHeader }
                   from '../../../../src/renderer/components/ui.js';
+import { t } from '../../../../src/renderer/utils/i18n.js';
 
 // Available note accent colors shown in the color swatch picker
 const COLORS = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#64748b'];
 
 export async function renderNoteList(el) {
   el.innerHTML = `<div class="nt-container">
-    ${viewHeader('📝 Notas', `<button class="nt-new-btn" id="nt-new-btn">+ Nueva nota</button>`, 'nt-header')}
-    <div class="nt-list" id="nt-list"><div class="nt-empty">Cargando…</div></div>
+    ${viewHeader(`📝 ${t('notes_title')}`, `<button class="nt-new-btn" id="nt-new-btn">+ ${t('new_note')}</button>`, 'nt-header')}
+    <div class="nt-list" id="nt-list"><div class="nt-empty">${t('loading')}</div></div>
   </div>`;
 
   el.querySelector('#nt-new-btn').addEventListener('click', () => _openForm(null, _refresh));
@@ -35,9 +36,7 @@ export async function renderNoteList(el) {
       const notes = await API.notes.list(username ? { username } : {});
       _renderList(listEl, notes, _refresh);
     } catch (err) {
-      listEl.innerHTML = `<div class="nt-empty" style="color:var(--red)">
-        Error al cargar notas: ${err.message || 'Error desconocido'}
-      </div>`;
+      listEl.innerHTML = `<div class="nt-empty" style="color:var(--red)">${t('notes_load_error')}</div>`;
     }
   }
 }
@@ -46,7 +45,7 @@ export async function renderNoteList(el) {
 
 function _renderList(container, notes, refresh) {
   if (!notes.length) {
-    container.innerHTML = `<div class="nt-empty">No hay notas todavía.<br>Crea tu primera nota con el botón de arriba.</div>`;
+    container.innerHTML = `<div class="nt-empty">${t('no_notes')}<br>${t('create_first_note')}</div>`;
     return;
   }
 
@@ -58,15 +57,15 @@ function _renderList(container, notes, refresh) {
           <span class="nt-title">${esc(n.title)}</span>
           ${n.important_date ? `<span class="nt-date">📅 ${n.important_date}</span>` : ''}
         </div>
-        <button class="nt-toggle-btn" title="Expandir / Colapsar">▼</button>
+        <button class="nt-toggle-btn" title="${t('expand')} / ${t('collapse')}">▼</button>
       </div>
       <div class="nt-card-body">
         ${n.content
           ? `<div class="nt-content">${esc(n.content)}</div>`
-          : `<div class="nt-content-empty">Sin contenido</div>`}
+          : `<div class="nt-content-empty">${t('no_content')}</div>`}
         <div class="nt-actions">
-          <button class="nt-action-btn nt-edit" data-id="${n.id}">✏️ Editar</button>
-          <button class="nt-action-btn danger nt-del" data-id="${n.id}">🗑️ Eliminar</button>
+          <button class="nt-action-btn nt-edit" data-id="${n.id}">✏️ ${t('edit')}</button>
+          <button class="nt-action-btn danger nt-del" data-id="${n.id}">🗑️ ${t('delete')}</button>
         </div>
       </div>
     </div>`).join('');
@@ -89,9 +88,9 @@ function _renderList(container, notes, refresh) {
   container.querySelectorAll('.nt-del').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
-      if (!confirm('¿Eliminar esta nota?')) return;
+      if (!confirm(t('delete_note_confirm'))) return;
       await API.notes.delete(parseInt(btn.dataset.id));
-      showToast('Nota eliminada', 'success');
+      showToast(t('note_deleted'), 'success');
       refresh();
     });
   });
@@ -109,20 +108,20 @@ function _openForm(note, onSaved) {
           data-color="${c}" style="background:${c}" title="${c}"></span>`).join('');
 
   openModal({
-    title: isEdit ? '✏️ Editar nota' : '📝 Nueva nota',
+    title: isEdit ? `✏️ ${t('edit_note')}` : `📝 ${t('new_note')}`,
     content: `
-      ${formGroup({ label: 'Título *',          id: 'nt-f-title',   dataField: 'title',          placeholder: 'Título de la nota',      value: esc(note?.title   || '') })}
-      ${formGroup({ label: 'Contenido',         id: 'nt-f-content', dataField: 'content',        type: 'textarea', rows: 5, placeholder: 'Escribe aquí tu nota…', value: esc(note?.content || '') })}
-      ${formGroup({ label: 'Fecha importante',  id: 'nt-f-date',    dataField: 'important_date', type: 'date',     value: note?.important_date || '' })}
+      ${formGroup({ label: `${t('note_title')} *`, id: 'nt-f-title', dataField: 'title', placeholder: t('note_title_placeholder'), value: esc(note?.title || '') })}
+      ${formGroup({ label: t('note_content'), id: 'nt-f-content', dataField: 'content', type: 'textarea', rows: 5, placeholder: t('note_content_placeholder'), value: esc(note?.content || '') })}
+      ${formGroup({ label: t('important_date'), id: 'nt-f-date', dataField: 'important_date', type: 'date', value: note?.important_date || '' })}
       <div class="form-group">
-        <label>Color</label>
+        <label>${t('color')}</label>
         <div class="nt-color-row" id="nt-color-row">${colorSwatches}</div>
         <input type="hidden" id="nt-f-color" value="${selColor}">
       </div>`,
     actions: [
-      { label: 'Cancelar', class: 'btn-secondary', action: close => close() },
+      { label: t('cancel'), class: 'btn-secondary', action: close => close() },
       {
-        label: isEdit ? 'Guardar' : 'Crear',
+        label: isEdit ? t('update_note') : t('create_note'),
         class: 'btn-primary',
         action: async (close, formEl) => {
           clearFieldErrors(formEl);
@@ -136,16 +135,16 @@ function _openForm(note, onSaved) {
           try {
             if (isEdit) {
               await API.notes.update(note.id, payload);
-              showToast('Nota actualizada', 'success');
+              showToast(t('note_updated'), 'success');
             } else {
               await API.notes.create(payload);
-              showToast('Nota creada', 'success');
+              showToast(t('note_created'), 'success');
             }
             close();
             onSaved();
           } catch (err) {
             markFieldErrors(err.fields, formEl);
-            showToast(err.message || 'Error al guardar', 'error');
+            showToast(t('note_save_error'), 'error');
           }
         },
       },

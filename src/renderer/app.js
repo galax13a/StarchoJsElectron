@@ -6,6 +6,8 @@ import { initErrorHandler, logError } from './utils/errorHandler.js';
 import { initRouter } from './router.js';
 import { initSidebar } from './components/Sidebar.js';
 import { initModal, showToast } from './components/Modal.js';
+import { initAppLock } from './lock.js';
+import { t } from './utils/i18n.js';
 
 let booted = false;
 
@@ -29,6 +31,7 @@ async function boot() {
 
   wireWindowControls();
   initModal();
+  await initAppLock();
   initSidebar(document.getElementById('sidebar'));
   initRouter();
   applyTitlebarTheme(store.state.settings?.titlebar_theme);
@@ -84,6 +87,6 @@ window.addEventListener('user:login', async (e) => {
   } catch (err) {
     logError(err);
     console.error('Starcho JS login bootstrap failed:', err);
-    showToast(err.message || 'No se pudo iniciar Starcho JS', 'error');
+    showToast(t('app_start_error'), 'error');
   }
 });

@@ -7,6 +7,7 @@ const { getDb } = require('../backend/database/connection');
 const log = require('electron-log');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 let authSessionPath = null;
 
@@ -69,6 +70,28 @@ function clearSecureSession() {
   try { fs.rmSync(authSessionPath, { force: true }); } catch (_) {}
 }
 
+function lockConfigPath(appPaths) { return path.join(appPaths.userData, 'app-lock.bin'); }
+
+function readLockConfig(appPaths) {
+  try {
+    const raw = fs.readFileSync(lockConfigPath(appPaths));
+    const text = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
+    const config = JSON.parse(text);
+    if (!['pin', 'password'].includes(config.mode)) return null;
+    return config;
+  } catch (_) { return null; }
+}
+
+function writeLockConfig(appPaths, config) {
+  const text = JSON.stringify(config);
+  const payload = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : Buffer.from(text, 'utf8');
+  fs.writeFileSync(lockConfigPath(appPaths), payload, { mode: 0o600 });
+}
+
+function hashLockPin(pin, saltHex) {
+  return crypto.scryptSync(pin, Buffer.from(saltHex, 'hex'), 32).toString('hex');
+}
+
 function registerIpcHandlers(appPaths, serverPort) {
   authSessionPath = path.join(appPaths.userData, 'auth-session.bin');
 
@@ -77,17 +100,49 @@ function registerIpcHandlers(appPaths, serverPort) {
   ipcMain.handle('app:get-paths', (event) => { requireTrustedSender(event); return appPaths; });
   ipcMain.handle('app:is-dev', (event) => { requireTrustedSender(event); return IS_DEV; });
 
-  ipcMain.handle('data:create-backup', async (event) => {
+  ipcMain.handle('data:create-backup', async (event, language) => {
     requireTrustedSender(event);
     const defaultName = `starcho-backup-${new Date().toISOString().slice(0, 10)}.db`;
     const result = await dialog.showSaveDialog(getMainWindow(), {
-      title: 'Guardar copia de seguridad',
+      title: language === 'en' ? 'Create backup' : 'Guardar copia de seguridad',
       defaultPath: path.join(appPaths.userData, defaultName),
       filters: [{ name: 'Base de datos SQLite', extensions: ['db'] }],
     });
     if (result.canceled || !result.filePath) return { canceled: true };
     await getDb().backup(path.resolve(result.filePath));
     return { canceled: false, path: result.filePath };
+  });
+
+  ipcMain.handle('lock:get-config', (event) => {
+    requireTrustedSender(event);
+    const config = readLockConfig(appPaths);
+    return config ? { configured: true, mode: config.mode } : { configured: false, mode: null };
+  });
+  ipcMain.handle('lock:set-config', (event, payload) => {
+    requireTrustedSender(event);
+    if (!payload || !['pin', 'password'].includes(payload.mode)) throw new Error('INVALID_LOCK_METHOD');
+    if (payload.mode === 'pin' && !/^\d{4}$/.test(String(payload.pin || ''))) throw new Error('INVALID_PIN');
+    const config = { mode: payload.mode };
+    if (payload.mode === 'pin') {
+      const salt = crypto.randomBytes(16).toString('hex');
+      config.salt = salt;
+      config.hash = hashLockPin(String(payload.pin), salt);
+    }
+    writeLockConfig(appPaths, config);
+    return { configured: true, mode: config.mode };
+  });
+  ipcMain.handle('lock:verify-pin', (event, pin) => {
+    requireTrustedSender(event);
+    const config = readLockConfig(appPaths);
+    if (!config || config.mode !== 'pin' || !/^\d{4}$/.test(String(pin || ''))) return false;
+    const actual = Buffer.from(hashLockPin(String(pin), config.salt), 'hex');
+    const expected = Buffer.from(config.hash, 'hex');
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+  });
+  ipcMain.handle('lock:clear-config', (event) => {
+    requireTrustedSender(event);
+    try { fs.rmSync(lockConfigPath(appPaths), { force: true }); } catch (_) {}
+    return true;
   });
 
   ipcMain.handle('auth:get-session', (event) => { requireTrustedSender(event); return readSecureSession(); });

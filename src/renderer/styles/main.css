@@ -450,6 +450,8 @@ body {
   border-color: rgba(255, 50, 50, 0.30);
   color: var(--red);
 }
+.sidebar-user .sb-logout-icon-btn + .sb-logout-icon-btn { margin-left: 2px; }
+.sidebar-user #btn-lock:hover { background: rgba(99,102,241,.12); border-color: rgba(99,102,241,.35); color: var(--purple); }
 
 /* ── Player Bar ───────────────────────────────────────────────────────────── */
 .player-inner {
@@ -1112,6 +1114,7 @@ body {
   transition: transform .22s ease;
 }
 .modal-overlay.open .modal { transform: scale(1) translateY(0); }
+.modal-help { color: var(--text-secondary); line-height: 1.6; margin: -8px 0 20px; font-size: 13px; }
 .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
 .modal-title  { font-size: 19px; font-weight: 700; }
 .modal-close  {
@@ -1129,6 +1132,38 @@ body {
   transition: all var(--transition);
 }
 .modal-close:hover { background: var(--red); color: #fff; }
+
+/* ── Application lock ────────────────────────────────────────────────────── */
+.app-lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 5, 12, .94);
+  backdrop-filter: blur(18px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+.app-lock-screen.visible { opacity: 1; pointer-events: auto; }
+.app-lock-card {
+  width: min(380px, 100%);
+  padding: 34px 30px 30px;
+  text-align: center;
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(99,102,241,.18);
+}
+.app-lock-icon { font-size: 42px; margin-bottom: 12px; }
+.app-lock-card h2 { font-size: 20px; margin-bottom: 7px; }
+.app-lock-card p { color: var(--text-secondary); font-size: 13px; margin-bottom: 20px; }
+.app-lock-input { text-align: center; letter-spacing: .35em; margin-bottom: 12px; }
+.app-lock-card .btn { width: 100%; justify-content: center; }
+.app-lock-error { min-height: 20px; margin-top: 12px; color: var(--red); font-size: 12px; }
 
 /* ── Shared component styles ───────────────────────────────────────────────── */
 /* .status-badge — colored inline badge used by html.js badge() helper */

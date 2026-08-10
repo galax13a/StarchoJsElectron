@@ -165,10 +165,10 @@ export async function renderSettings(el) {
       showToast(t('profile_saved'), 'success');
       button.textContent = t('saved');
       setTimeout(() => { if (button.isConnected) { button.disabled = false; button.textContent = t('save_changes'); } }, 900);
-    } catch (error) {
+    } catch (_) {
       button.disabled = false;
       button.textContent = t('save_changes');
-      showToast(error.message || t('account_error'), 'error');
+      showToast(t('profile_save_error'), 'error');
     }
   });
 
@@ -186,7 +186,7 @@ export async function renderSettings(el) {
       document.getElementById('login-page')?.setAttribute('data-ltheme', selected);
       el.querySelectorAll('[data-login-theme]').forEach((item) => item.classList.toggle('active', item === button));
       showToast(t('saved'), 'success');
-    } catch (error) { showToast(error.message, 'error'); }
+    } catch (_) { showToast(t('preferences_save_error'), 'error'); }
   }));
   el.querySelectorAll('[data-titlebar-theme]').forEach((button) => button.addEventListener('click', async () => {
     const selected = button.dataset.titlebarTheme;
@@ -196,16 +196,16 @@ export async function renderSettings(el) {
       store.setState({ settings: { ...store.state.settings, titlebar_theme: selected } });
       el.querySelectorAll('[data-titlebar-theme]').forEach((item) => item.classList.toggle('active', item === button));
       showToast(t('saved'), 'success');
-    } catch (error) { showToast(error.message, 'error'); }
+    } catch (_) { showToast(t('preferences_save_error'), 'error'); }
   }));
   el.querySelector('#btn-create-backup')?.addEventListener('click', async () => {
     const button = el.querySelector('#btn-create-backup');
     if (!window.electronAPI?.createBackup) { showToast(t('backup_unavailable'), 'error'); return; }
     button.disabled = true;
     try {
-      const result = await window.electronAPI.createBackup();
+      const result = await window.electronAPI.createBackup(getLang());
       if (!result?.canceled) showToast(`${t('backup_success')}: ${result.path}`, 'success');
-    } catch (error) { showToast(error.message || t('backup_unavailable'), 'error'); }
+    } catch (_) { showToast(t('backup_unavailable'), 'error'); }
     finally { button.disabled = false; }
   });
 }

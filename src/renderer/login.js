@@ -54,11 +54,10 @@
 
   function loginText(key) { return LOGIN_TEXT[loginLang][key] || LOGIN_TEXT.es[key] || key; }
   function persistLoginSetting(key, value) {
-    getPort().then(function (port) {
-      return fetch('http://127.0.0.1:' + port + '/api/settings', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: value }),
-      });
-    }).catch(function () { /* localStorage remains the fallback */ });
+    // Settings API requires an authenticated bearer session. Login preferences
+    // are intentionally kept local until the user signs in and opens Settings.
+    if (key === 'theme') localStorage.setItem('starcho_theme', value);
+    if (key === 'language') localStorage.setItem('starcho_language', value);
   }
   function applyLoginTheme(theme, persist) {
     var selected = LOGIN_SKINS.indexOf(theme) >= 0 ? theme : 'dark';
@@ -100,17 +99,6 @@
 
   var loginPg = document.getElementById('login-page');
   initLoginPreferences();
-
-  // Apply login theme from DB — data-ltheme="nebula" is the HTML default;
-  // update as soon as the local API responds (always fast, same process).
-  getPort().then(function (port) {
-    return fetch('http://127.0.0.1:' + port + '/api/settings');
-  }).then(function (res) { return res.json(); })
-    .then(function (s) {
-      if (s && s.login_theme) loginPg.setAttribute('data-ltheme', s.login_theme);
-      if (s && s.theme && !localStorage.getItem('starcho_theme')) applyLoginTheme(s.theme, false);
-      if (s && s.language && !localStorage.getItem('starcho_language')) applyLoginLanguage(s.language, false);
-    }).catch(function () { /* keep HTML default 'nebula' */ });
 
   // ── SVG helpers ──────────────────────────────────────────────────────────
   var SVG_EYE_OPEN = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';

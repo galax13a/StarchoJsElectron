@@ -1,5 +1,6 @@
 import API from '../utils/api.js';
 import store from '../store.js';
+import { t } from '../utils/i18n.js';
 
 export function markFieldErrors(fields, container) {
   if (!fields || !container) return;
@@ -50,20 +51,20 @@ export function openModal({ title, content, actions = [] }) {
   overlay.querySelector('.modal-close').addEventListener('click', close);
   overlay.addEventListener('click', (event) => { if (event.target === overlay) close(); });
   actions.forEach((action, index) => overlay.querySelector(`[data-modal-action="${index}"]`)?.addEventListener('click', () => action.action?.(close, overlay.querySelector('.modal-body'))));
-  return { close };
+  return { close, overlay, body: overlay.querySelector('.modal-body') };
 }
 
 export function openProfileModal() {
   const settings = store.state.settings || {};
   const username = store.state.loggedUser?.username;
   openModal({
-    title: '👤 Editar perfil',
-    content: `<div class="form-group"><label>Nombre completo</label><input class="form-control" id="profile-name" data-field="full_name" value="${safe(settings.full_name)}"></div>
-      <div class="form-group"><label>Apodo</label><input class="form-control" id="profile-nickname" data-field="nickname" value="${safe(settings.nickname)}"></div>
-      <div class="form-group"><label>WhatsApp</label><input class="form-control" id="profile-whatsapp" data-field="whatsapp" value="${safe(settings.whatsapp)}"></div>`,
+    title: `👤 ${t('edit_profile')}`,
+    content: `<div class="form-group"><label>${t('full_name')}</label><input class="form-control" id="profile-name" data-field="full_name" value="${safe(settings.full_name)}"></div>
+      <div class="form-group"><label>${t('nickname')}</label><input class="form-control" id="profile-nickname" data-field="nickname" value="${safe(settings.nickname)}"></div>
+      <div class="form-group"><label>${t('whatsapp')}</label><input class="form-control" id="profile-whatsapp" data-field="whatsapp" value="${safe(settings.whatsapp)}"></div>`,
     actions: [
-      { label: 'Cancelar', class: 'btn-secondary', action: (close) => close() },
-      { label: 'Guardar', class: 'btn-primary', action: async (close, body) => {
+      { label: t('cancel'), class: 'btn-secondary', action: (close) => close() },
+      { label: t('save'), class: 'btn-primary', action: async (close, body) => {
         const data = {
           username,
           full_name: body.querySelector('#profile-name').value.trim(),
@@ -75,8 +76,8 @@ export function openProfileModal() {
           await API.auth.updateProfile(data);
           store.setState({ settings: { ...store.state.settings, ...data } });
           close();
-          showToast('Perfil guardado', 'success');
-        } catch (error) { showToast(error.message, 'error'); }
+          showToast(t('profile_saved'), 'success');
+        } catch (_) { showToast(t('profile_save_error'), 'error'); }
       } },
     ],
   });
