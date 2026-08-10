@@ -7,6 +7,9 @@
 - Suite de calidad ampliada para autenticación, perfil, avatar, preferencias y seguridad HTTP.
 - Comando portable `npm run check` para validar la sintaxis JavaScript.
 - Pipeline CI con pruebas, auditoría npm, CodeQL y Dependabot.
+- Recuperación del PIN olvidado mediante la contraseña de la cuenta, con textos en Español/Inglés.
+- El bloqueo configurado vuelve a solicitar acceso después de reiniciar la aplicación.
+- ESLint, Prettier, Husky, rate limiting, hash de sesiones y builds multiplataforma automatizados.
 
 ## 2.0.0 — 2026-08-10
 
