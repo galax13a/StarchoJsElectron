@@ -93,7 +93,7 @@ const PluginRegistry = {
           <span class="dash-widget-title">${w.title || w.id}</span>
         </div>
         <div class="dash-widget-body">
-          <div class="dash-widget-loading">Cargando…</div>
+          <div class="dash-widget-loading">${t('loading')}</div>
         </div>`;
       container.appendChild(wrap);
 

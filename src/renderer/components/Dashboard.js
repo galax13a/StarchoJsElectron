@@ -6,13 +6,14 @@ import { dateStr, greeting } from '../utils/formatters.js';
 import { esc } from '../utils/html.js';
 import { t } from '../utils/i18n.js';
 
+let renderSequence = 0;
+
 export async function renderDashboard(el) {
+  const sequence = ++renderSequence;
   const settings = store.state.settings || {};
   const user = store.state.loggedUser || {};
   const name = settings.nickname || settings.full_name || user.username || t('user');
   const cfg = store.state.appConfig || {};
-  let notes = [];
-  try { notes = await API.notes.list(user.username ? { username: user.username } : {}); } catch (_) {}
 
   el.innerHTML = `
     <div class="dash-wrap">
@@ -38,8 +39,8 @@ export async function renderDashboard(el) {
           </div>
         </div>
         <div class="dash-stats">
-          <div class="dash-stat"><span class="dash-stat-num">${notes.length}</span><span class="dash-stat-lbl">📝 ${t('notes_title')}</span></div>
-          <div class="dash-stat"><span class="dash-stat-num">${notes.filter(n => n.important_date).length}</span><span class="dash-stat-lbl">📅 ${t('notes_with_date')}</span></div>
+          <div class="dash-stat"><span class="dash-stat-num" id="dash-notes-total">0</span><span class="dash-stat-lbl">📝 ${t('notes_title')}</span></div>
+          <div class="dash-stat"><span class="dash-stat-num" id="dash-notes-dated">0</span><span class="dash-stat-lbl">📅 ${t('notes_with_date')}</span></div>
         </div>
       </div>
 
@@ -58,5 +59,14 @@ export async function renderDashboard(el) {
   el.querySelector('#dh-notes-btn')?.addEventListener('click', () => store.navigate('notes:list'));
   el.querySelector('#dash-open-notes')?.addEventListener('click', () => store.navigate('notes:list'));
   el.querySelector('#dash-open-settings')?.addEventListener('click', () => store.navigate('settings'));
+
+  // Paint the dashboard shell before waiting for the API. A slow or expired
+  // session must not leave the whole view blank.
+  let notes = [];
+  try { notes = await API.notes.list(user.username ? { username: user.username } : {}); } catch (_) {}
+  // Ignore a slower render started before a newer navigation or profile load.
+  if (sequence !== renderSequence) return;
+  el.querySelector('#dash-notes-total').textContent = String(notes.length);
+  el.querySelector('#dash-notes-dated').textContent = String(notes.filter(n => n.important_date).length);
   await PluginRegistry.renderDashboardZone('content', el.querySelector('#dash-zone-content'));
 }

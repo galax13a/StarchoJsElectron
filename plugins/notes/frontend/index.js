@@ -9,6 +9,7 @@
 import API from '../../../src/renderer/utils/api.js';
 import { statRow, grid, esc } from '../../../src/renderer/utils/html.js';
 import { recentList }         from '../../../src/renderer/components/ui.js';
+import { t }                  from '../../../src/renderer/utils/i18n.js';
 
 export default {
   id: 'notes',
@@ -38,7 +39,7 @@ export default {
 
   dashboardWidgets: [
     {
-      id: 'notes-summary', zone: 'content', priority: 70, title: '📝 Notas',
+      id: 'notes-summary', zone: 'content', priority: 70, title: `📝 ${t('notes_title')}`,
       async render(el) {
         let notes = [];
         try { notes = await API.notes.list(); } catch (_) {}
@@ -49,13 +50,13 @@ export default {
 
         el.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px">
           ${grid(2, '8px',
-            statRow('📝', 'Total',     notes.length),
-            statRow('📅', 'Con fecha', withDate),
+            statRow('📝', t('total_notes'), notes.length),
+            statRow('📅', t('notes_with_date'), withDate),
           )}
           ${recentList(recent, n => `
             <div style="font-size:12px;color:var(--text-secondary);
                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-              📝 ${esc(n.title || 'Sin título')}
+              📝 ${esc(n.title || t('untitled'))}
             </div>`)}
         </div>`;
       },
