@@ -56,7 +56,40 @@ function createWindow() {
     webPreferences: webPreferences(),
     icon: path.join(__dirname, '..', '..', 'assets', 'icons', 'icon.png'),
   });
-  mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  const rendererPath = path.join(__dirname, '..', 'renderer', 'index.html');
+  let loadAttempts = 0;
+  let revealed = false;
+  const revealWindow = () => {
+    if (revealed || mainWindow.isDestroyed()) return;
+    revealed = true;
+    mainWindow.maximize();
+    mainWindow.show();
+  };
+  const loadRenderer = () => {
+    loadAttempts += 1;
+    mainWindow.loadFile(rendererPath).catch((error) => {
+      log.error(`Renderer load attempt ${loadAttempts} failed:`, error.message);
+    });
+  };
+  loadRenderer();
+  mainWindow.webContents.on('did-finish-load', () => {
+    log.info(`Renderer loaded successfully [attempt=${loadAttempts}]`);
+  });
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame) return;
+    log.error(`Renderer failed to load [${errorCode}] ${errorDescription}: ${validatedURL}`);
+    if (loadAttempts < 2) {
+      setTimeout(loadRenderer, 100);
+    } else {
+      revealWindow();
+    }
+  });
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    log.error(`Renderer process exited [reason=${details.reason}, exitCode=${details.exitCode}]`);
+  });
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level >= 2) log.warn(`[Renderer] ${message} (${sourceId}:${line})`);
+  });
   if (DEVTOOLS) mainWindow.webContents.once('did-finish-load', () => mainWindow.webContents.openDevTools({ mode: 'detach' }));
   if (IS_DEV) {
     mainWindow.webContents.on('before-input-event', (_event, input) => {
@@ -66,7 +99,11 @@ function createWindow() {
     });
   }
   lockDown(mainWindow);
-  mainWindow.once('ready-to-show', () => { mainWindow.maximize(); mainWindow.show(); });
+  mainWindow.once('ready-to-show', revealWindow);
+  // A renderer error can prevent ready-to-show. Keep the app visible so the
+  // user can use the recovery screen or close the process instead of seeing a
+  // hidden/black window with no feedback.
+  setTimeout(revealWindow, 4000);
   mainWindow.on('maximize', () => mainWindow.webContents.send('window:maximized', true));
   mainWindow.on('unmaximize', () => mainWindow.webContents.send('window:maximized', false));
   mainWindow.on('closed', () => { mainWindow = null; });

@@ -9,8 +9,9 @@
     "node": ">=24.19.0 <25"
   },
   "scripts": {
-    "start": "electron .",
+    "start": "cross-env NODE_ENV=development electron .",
     "dev": "cross-env NODE_ENV=development electron .",
+    "start:production": "cross-env NODE_ENV=production electron .",
     "test": "node --test",
     "check": "node scripts/verify.mjs",
     "ci": "npm run check && npm test && npm audit --omit=dev --audit-level=high",
