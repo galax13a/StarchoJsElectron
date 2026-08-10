@@ -78,3 +78,7 @@ export function initRouter() {
   // Start on home dashboard
   void showView('home').catch(showFatalError);
 }
+
+// Used by the login bootstrap to wait until the first real view is rendered
+// before the login screen is removed.
+export { showView as renderView };

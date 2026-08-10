@@ -111,10 +111,10 @@ function lockErrorMessage(error) {
 
 export async function initAppLock() {
   ensureOverlay();
-  const config = await getConfig();
-  // A configured lock protects every new session, including after a restart.
-  // Password recovery remains available from the PIN screen.
-  if (config.configured) setLocked(true, config.mode);
+  // The lock is opt-in and must only become visible after the user presses
+  // the lock icon in the sidebar. Merely configuring a method never blocks
+  // startup or hides the dashboard.
+  await getConfig();
 }
 
 export async function openAppLock() {

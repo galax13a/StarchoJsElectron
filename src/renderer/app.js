@@ -3,7 +3,7 @@ import API from './utils/api.js';
 import store from './store.js';
 import PluginRegistry from './core/PluginRegistry.js';
 import { initErrorHandler, logError } from './utils/errorHandler.js';
-import { initRouter } from './router.js';
+import { initRouter, renderView } from './router.js';
 import { initSidebar } from './components/Sidebar.js';
 import { initModal, showToast } from './components/Modal.js';
 import { initAppLock } from './lock.js';
@@ -94,22 +94,33 @@ function wireKeyboard() {
   });
 }
 
+function dispatchLoginEvent(name, detail) {
+  window.dispatchEvent(new CustomEvent(name, { detail }));
+}
+
 window.addEventListener('user:login', async (e) => {
   store.setState({ loggedUser: e.detail });
   try {
     await boot();
     await store.loadUserProfile();
     const lastView = (() => { try { return localStorage.getItem('last_view'); } catch (_) { return null; } })();
-    store.navigate(lastView === 'notes:list' ? lastView : 'home');
+    const destination = lastView === 'notes:list' ? lastView : 'home';
+    store.setState({ currentView: destination });
+    try { localStorage.setItem('last_view', destination); } catch (_) {}
+    await renderView(destination);
+    dispatchLoginEvent('user:login:ready', e.detail);
   } catch (err) {
     logError(err);
     console.error('Starcho JS login bootstrap failed:', err);
     showToast(t('app_start_error'), 'error');
+    dispatchLoginEvent('user:login:error', err);
     showFatalError(err, {
       retry: async () => {
         await boot();
         await store.loadUserProfile();
-        store.navigate('home');
+        store.setState({ currentView: 'home' });
+        await renderView('home');
+        dispatchLoginEvent('user:login:ready', e.detail);
       },
     });
   }

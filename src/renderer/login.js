@@ -23,7 +23,7 @@
       error_register_user: 'Ingresa un nombre de usuario', error_user_length: 'El usuario debe tener al menos 3 caracteres',
       error_register_password: 'Ingresa una contraseña', error_password_length: 'La contraseña debe tener al menos 6 caracteres',
       error_password_match: 'Las contraseñas no coinciden', creating_account: 'Creando cuenta…', account_created: 'Cuenta creada',
-      account_error: 'Error al crear la cuenta',
+      account_error: 'Error al crear la cuenta', account_exists: 'Ese usuario ya existe', too_many_attempts: 'Demasiados intentos. Espera 15 minutos.',
     },
     en: {
       login_side_sub: 'Simple, fast, and organized notes',
@@ -46,7 +46,7 @@
       error_register_user: 'Enter a username', error_user_length: 'Username must be at least 3 characters',
       error_register_password: 'Enter a password', error_password_length: 'Password must be at least 6 characters',
       error_password_match: 'Passwords do not match', creating_account: 'Creating account…', account_created: 'Account created',
-      account_error: 'Could not create the account',
+      account_error: 'Could not create the account', account_exists: 'That username already exists', too_many_attempts: 'Too many attempts. Try again in 15 minutes.',
     },
   };
   var loginLang = localStorage.getItem('starcho_language') === 'en' ? 'en' : 'es';
@@ -124,6 +124,17 @@
     }, 500);
   }
 
+  // Remove the login screen only after the renderer has booted and rendered
+  // its first view; this prevents a blank dashboard after a slow start.
+  window.addEventListener('user:login:ready', function () { enter(); });
+  window.addEventListener('user:login:error', function () {
+    loginPg.style.opacity = '';
+    if (loginBtn) {
+      loginBtn.style.background = '';
+      resetBtn(loginBtn, SVG_LOGIN, loginText('login_button'));
+    }
+  });
+
   // ── Panel switcher ───────────────────────────────────────────────────────
   var panelLogin    = document.getElementById('lp-panel-login');
   var panelRegister = document.getElementById('lp-panel-register');
@@ -196,12 +207,11 @@
         headers: { Authorization: 'Bearer ' + storedSession.token },
       });
     }).then(function (res) {
-      return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+      return res.json().then(function (data) { return { ok: res.ok, status: res.status, data: data }; });
     }).then(function (r) {
       if (r.ok) {
         window.__starchoSessionToken = storedSession.token;
         window.dispatchEvent(new CustomEvent('user:login', { detail: r.data }));
-        enter();
       } else {
         clearStoredSession();
         loginPg.style.opacity = '';
@@ -222,11 +232,14 @@
   }
   function apiPost(path, body) {
     return getPort().then(function (port) {
+      var controller = new AbortController();
+      var timeout = setTimeout(function () { controller.abort(); }, 12000);
       return fetch('http://127.0.0.1:' + port + '/api' + path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      });
+        signal: controller.signal,
+      }).finally(function () { clearTimeout(timeout); });
     });
   }
 
@@ -247,6 +260,12 @@
   function resetBtn(btn, svgInner, label) {
     btn.disabled = false;
     btn.innerHTML = makeSvg(svgInner) + ' ' + label;
+  }
+  function responseError(result, fallback) {
+    if (result.status === 409) return loginText('account_exists');
+    if (result.status === 429) return loginText('too_many_attempts');
+    if (result.status === 401) return loginText('invalid_credentials');
+    return fallback;
   }
 
   // ── Login form ───────────────────────────────────────────────────────────
@@ -272,8 +291,8 @@
       })
       .then(function (r) {
         if (r.ok) {
-          // Store only the session token, never the password. Prefer the
-          // operating system secure store and fall back only when unavailable.
+          // Store only the session token, never the password. Use the
+          // operating system secure store without a localStorage fallback.
           var session = {
               token:      r.data.token,
               username:   r.data.username || user,
@@ -287,11 +306,10 @@
             loginBtn.innerHTML = makeSvg('<polyline points="20 6 9 17 4 12"/>') + ' ' + loginText('welcome');
             loginBtn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
             window.dispatchEvent(new CustomEvent('user:login', { detail: r.data }));
-            setTimeout(enter, 500);
-          });
-        } else {
-          resetBtn(loginBtn, SVG_LOGIN, loginText('login_button'));
-          showError(loginErrEl, r.data.error || loginText('invalid_credentials'));
+        });
+      } else {
+        resetBtn(loginBtn, SVG_LOGIN, loginText('login_button'));
+        showError(loginErrEl, responseError(r, loginText('invalid_credentials')));
         }
       })
       .catch(function () {
@@ -322,7 +340,7 @@
 
     apiPost('/auth/register', { username: user, password: pass })
       .then(function (res) {
-        return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+      return res.json().then(function (data) { return { ok: res.ok, status: res.status, data: data }; });
       })
       .then(function (r) {
         if (r.ok) {
@@ -336,7 +354,7 @@
           }, 1200);
         } else {
           resetBtn(regBtn, SVG_REGISTER, loginText('create_account'));
-          showError(regErrEl, r.data.error || loginText('account_error'));
+          showError(regErrEl, responseError(r, loginText('account_error')));
         }
       })
       .catch(function () {
