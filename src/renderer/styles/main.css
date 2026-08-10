@@ -29,6 +29,48 @@ body {
   height: 100vh;
 }
 
+/* ── Recoverable renderer failure screen ─────────────────────────────────── */
+.fatal-error-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg-base) 92%, #000 8%);
+}
+.fatal-error-screen.visible { display: flex; }
+.fatal-error-card {
+  width: min(560px, 100%);
+  max-height: min(90vh, 680px);
+  overflow: auto;
+  padding: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+.fatal-error-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--red) 18%, transparent);
+  color: var(--red);
+  font-size: 28px;
+  font-weight: 800;
+}
+.fatal-error-card h1 { font-size: 21px; margin-bottom: 10px; }
+.fatal-error-card p { color: var(--text-secondary); line-height: 1.6; }
+.fatal-error-details-wrap { margin: 20px 0; text-align: left; color: var(--text-muted); font-size: 12px; }
+.fatal-error-details-wrap summary { cursor: pointer; }
+.fatal-error-details { margin-top: 8px; padding: 10px; max-height: 150px; overflow: auto; white-space: pre-wrap; color: var(--text-secondary); background: var(--bg-base); border-radius: var(--radius-sm); }
+.fatal-error-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
 /* ── Title Bar ────────────────────────────────────────────────────────────── */
 .title-bar {
   height: var(--titlebar-height);

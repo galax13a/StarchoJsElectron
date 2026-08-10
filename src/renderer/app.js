@@ -8,36 +8,53 @@ import { initSidebar } from './components/Sidebar.js';
 import { initModal, showToast } from './components/Modal.js';
 import { initAppLock } from './lock.js';
 import { t } from './utils/i18n.js';
+import { showFatalError } from './utils/fatalScreen.js';
 
 let booted = false;
+let bootPromise = null;
+let errorHandlerReady = false;
 
 async function boot() {
   if (booted) return;
-  booted = true;
-  initErrorHandler();
+  if (bootPromise) return bootPromise;
+  bootPromise = (async () => {
+    if (!errorHandlerReady) {
+      initErrorHandler((error) => showFatalError(error));
+      errorHandlerReady = true;
+    }
 
-  if (window.electronAPI) {
-    const port = await window.electronAPI.getServerPort();
-    API.setBase(`http://127.0.0.1:${port}`);
+    if (window.electronAPI) {
+      const port = await window.electronAPI.getServerPort();
+      API.setBase(`http://127.0.0.1:${port}`);
+    }
+
+    await Promise.all([store.loadSettings(), store.loadConfig()]);
+    const cfg = store.state.appConfig;
+    const title = document.getElementById('tb-title');
+    if (title) title.textContent = `${cfg.appName || 'Starcho JS'} v${cfg.appVersion || '2.0.0'}`;
+
+    // Notes is the only application module enabled in this distribution.
+    await PluginRegistry.init();
+
+    wireWindowControls();
+    initModal();
+    await initAppLock();
+    initSidebar(document.getElementById('sidebar'));
+    initRouter();
+    applyTitlebarTheme(store.state.settings?.titlebar_theme);
+    wireKeyboard();
+
+    booted = true;
+    console.log('Starcho JS v2.0.0 ready');
+  })();
+
+  try {
+    await bootPromise;
+  } catch (error) {
+    booted = false;
+    bootPromise = null;
+    throw error;
   }
-
-  await Promise.all([store.loadSettings(), store.loadConfig()]);
-  const cfg = store.state.appConfig;
-  const title = document.getElementById('tb-title');
-  if (title) title.textContent = `${cfg.appName || 'Starcho JS'} v${cfg.appVersion || '2.0.0'}`;
-
-  // Notes is the only application module enabled in this distribution.
-  await PluginRegistry.init();
-
-  wireWindowControls();
-  initModal();
-  await initAppLock();
-  initSidebar(document.getElementById('sidebar'));
-  initRouter();
-  applyTitlebarTheme(store.state.settings?.titlebar_theme);
-  wireKeyboard();
-
-  console.log('Starcho JS v2.0.0 ready');
 }
 
 function wireWindowControls() {
@@ -88,5 +105,12 @@ window.addEventListener('user:login', async (e) => {
     logError(err);
     console.error('Starcho JS login bootstrap failed:', err);
     showToast(t('app_start_error'), 'error');
+    showFatalError(err, {
+      retry: async () => {
+        await boot();
+        await store.loadUserProfile();
+        store.navigate('home');
+      },
+    });
   }
 });

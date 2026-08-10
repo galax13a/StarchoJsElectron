@@ -4,6 +4,7 @@ import PluginRegistry  from './core/PluginRegistry.js';
 
 import { renderDashboard } from './components/Dashboard.js';
 import { renderSettings  } from './components/Settings.js';
+import { showFatalError } from './utils/fatalScreen.js';
 
 // ── Core views (always available) ────────────────────────────────────────────
 const CORE_VIEWS = {
@@ -14,7 +15,7 @@ const CORE_VIEWS = {
 
 let _current = null;
 
-function showView(name, extra = {}) {
+async function showView(name, extra = {}) {
   // Hide all views
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
 
@@ -23,7 +24,7 @@ function showView(name, extra = {}) {
     const slot = document.getElementById('view-plugin');
     if (slot) {
       slot.classList.add('active');
-      PluginRegistry.renderView(name, slot, extra);
+      await PluginRegistry.renderView(name, slot, extra);
     }
     _current = name;
     _updateSidebarActive(name);
@@ -34,14 +35,14 @@ function showView(name, extra = {}) {
   const def = CORE_VIEWS[name];
   if (!def) {
     // Fallback to dashboard
-    showView('dashboard');
+    await showView('dashboard');
     return;
   }
 
   const el = document.getElementById(def.el);
   if (el) {
     el.classList.add('active');
-    def.render(el, extra);
+    await def.render(el, extra);
   }
   _current = name;
   _updateSidebarActive(name);
@@ -56,7 +57,7 @@ function _updateSidebarActive(name) {
 export function initRouter() {
   EventBus.on('navigate', ({ view, ...extra }) => {
     if (!store.state.loggedUser) return; // ignore nav events before login
-    showView(view, extra);
+    void showView(view, extra).catch(showFatalError);
   });
 
   // Re-render active view on language change
@@ -64,16 +65,16 @@ export function initRouter() {
     if (!_current) return;
     if (_current.includes(':')) {
       const slot = document.getElementById('view-plugin');
-      if (slot) PluginRegistry.renderView(_current, slot);
+      if (slot) void PluginRegistry.renderView(_current, slot).catch(showFatalError);
       return;
     }
     const def = CORE_VIEWS[_current];
     if (def) {
       const el = document.getElementById(def.el);
-      if (el) def.render(el, {});
+      if (el) void def.render(el, {}).catch(showFatalError);
     }
   });
 
   // Start on home dashboard
-  showView('home');
+  void showView('home').catch(showFatalError);
 }

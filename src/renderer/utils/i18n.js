@@ -70,6 +70,8 @@ const strings = {
     profile_save_error: 'No se pudo guardar el perfil.', preferences_save_error: 'No se pudieron guardar las preferencias.', app_slogan: 'Notas simples, rápidas y organizadas',
     reset_avatar: 'Usar avatar predeterminado', settings_loaded: 'Preferencias cargadas',
     about_text: 'Starcho JS es una aplicación local para crear, editar y organizar tus notas.',
+    fatal_title: 'La aplicación encontró un problema', fatal_message: 'Starcho JS no pudo cargar esta pantalla. Puedes reintentar o cerrar la aplicación.',
+    fatal_details: 'Detalles técnicos', retry: 'Reintentar', reload_app: 'Recargar', exit_app: 'Cerrar aplicación',
   },
   en: {
     nav_home: 'Home', nav_notes: 'Notes', nav_settings: 'Settings', nav_modules: 'Modules',
@@ -119,6 +121,8 @@ const strings = {
     profile_save_error: 'The profile could not be saved.', preferences_save_error: 'Preferences could not be saved.', app_slogan: 'Simple, fast, and organized notes',
     reset_avatar: 'Use default avatar', settings_loaded: 'Preferences loaded',
     about_text: 'Starcho JS is a local application for creating, editing, and organizing your notes.',
+    fatal_title: 'The application encountered a problem', fatal_message: 'Starcho JS could not load this screen. You can retry or close the application.',
+    fatal_details: 'Technical details', retry: 'Retry', reload_app: 'Reload', exit_app: 'Close application',
   },
 };
 

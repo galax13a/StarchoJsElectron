@@ -95,11 +95,24 @@ function stopServer() {
       closeDatabase();
       return resolve();
     }
-    activeServer.close(() => {
-      activeServer = null;
+    const server = activeServer;
+    activeServer = null;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(forceCloseTimer);
       closeDatabase();
       resolve();
-    });
+    };
+    // Renderer requests can keep an HTTP socket alive while Electron is
+    // quitting. Give normal requests a short window, then force-close them.
+    const forceCloseTimer = setTimeout(() => {
+      server.closeAllConnections?.();
+      finish();
+    }, 1500);
+    server.closeIdleConnections?.();
+    server.close(finish);
   });
 }
 

@@ -13,12 +13,16 @@ export function logWarn(msg) {
   window.electronAPI?.logError?.(`WARN: ${String(msg)}`);
 }
 
-export function initErrorHandler() {
+export function initErrorHandler(onFatal) {
   window.onerror = (_msg, _src, _line, _col, err) => {
-    logError(err || `${_msg} (${_src}:${_line}:${_col})`);
+    const failure = err || `${_msg} (${_src}:${_line}:${_col})`;
+    logError(failure);
+    onFatal?.(failure);
     return false;
   };
   window.addEventListener('unhandledrejection', (e) => {
-    logError(e.reason || 'Unhandled promise rejection');
+    const failure = e.reason || 'Unhandled promise rejection';
+    logError(failure);
+    onFatal?.(failure);
   });
 }

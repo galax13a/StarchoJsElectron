@@ -199,7 +199,9 @@ function registerIpcHandlers(appPaths, serverPort) {
     const win = getMainWindow();
     if (win) win.isMaximized() ? win.unmaximize() : win.maximize();
   });
-  ipcMain.on('window:close', (event) => { if (acceptTrustedSender(event)) getMainWindow()?.close(); });
+  // Use app.quit() so the close control also terminates the backend on macOS,
+  // where closing the only window normally leaves the process running.
+  ipcMain.on('window:close', (event) => { if (acceptTrustedSender(event)) app.quit(); });
   ipcMain.handle('window:is-maximized', (event) => { requireTrustedSender(event); return getMainWindow()?.isMaximized() ?? false; });
   ipcMain.on('app:set-theme', (event, theme) => {
     if (!acceptTrustedSender(event) || !['dark', 'light'].includes(theme)) return;

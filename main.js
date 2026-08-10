@@ -24,7 +24,7 @@ if (fs.existsSync(_envPath)) {
 const { createWindow, getMainWindow } = require('./src/main/windowManager');
 const { registerIpcHandlers } = require('./src/main/ipcHandlers');
 const { buildMenu } = require('./src/main/menuBuilder');
-const { startServer } = require('./src/backend/server');
+const { startServer, stopServer } = require('./src/backend/server');
 const { IS_PROD, IS_DEV } = require('./src/main/env');
 
 log.transports.file.level = IS_PROD ? 'warn' : 'info';
@@ -58,6 +58,7 @@ const APP_PATHS = {
 global.APP_PATHS = APP_PATHS;
 
 let serverPort = parseInt(process.env.PORT) || 3847;
+let isQuitting = false;
 
 app.whenReady().then(async () => {
   // Ensure data directories exist
@@ -100,6 +101,17 @@ app.on('second-instance', () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', (event) => {
+  if (isQuitting) return;
+  isQuitting = true;
+  event.preventDefault();
+  const win = getMainWindow();
+  if (win && !win.isDestroyed()) win.destroy();
+  Promise.resolve(stopServer())
+    .catch((error) => log.error('Failed to stop backend cleanly:', error))
+    .finally(() => app.exit(0));
 });
 
 app.on('will-quit', () => log.info('Starcho JS shutting down'));
