@@ -5,8 +5,10 @@ const cors    = require('cors');
 const http    = require('http');
 const log     = require('electron-log');
 
-const { initDatabase, getDb } = require('./database/connection');
+const { initDatabase, getDb, closeDatabase } = require('./database/connection');
 const pluginManager           = require('./core/PluginManager');
+
+let activeServer = null;
 
 async function startServer(appPaths, preferredPort) {
   // 1. Init SQLite
@@ -15,9 +17,26 @@ async function startServer(appPaths, preferredPort) {
 
   // 2. Build Express app
   const expressApp = express();
-  expressApp.use(cors({ origin: '*' }));
-  expressApp.use(express.json({ limit: '10mb' }));
-  expressApp.use(express.urlencoded({ extended: true }));
+  expressApp.disable('x-powered-by');
+  expressApp.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
+  expressApp.use(cors({
+    origin(origin, callback) {
+      if (!origin || origin === 'null') return callback(null, true);
+      try {
+        const url = new URL(origin);
+        const local = (url.hostname === '127.0.0.1' || url.hostname === 'localhost') && url.protocol === 'http:';
+        return callback(null, local);
+      } catch (_) { return callback(null, false); }
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
+  expressApp.use(express.json({ limit: '1mb' }));
+  expressApp.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
   // App icon
   const path = require('path');
@@ -50,7 +69,10 @@ async function startServer(appPaths, preferredPort) {
   // eslint-disable-next-line no-unused-vars
   expressApp.use((err, req, res, _next) => {
     log.error(`[API] 500 ${req.method} ${req.originalUrl}:`, err.message, err.stack);
-    if (!res.headersSent) res.status(500).json({ error: err.message || 'Internal server error' });
+    if (!res.headersSent) {
+      const detail = process.env.NODE_ENV === 'production' ? 'Internal server error' : (err.message || 'Internal server error');
+      res.status(500).json({ error: detail });
+    }
   });
 
   // 6. Start listening
@@ -59,10 +81,25 @@ async function startServer(appPaths, preferredPort) {
 
   return new Promise((resolve, reject) => {
     server.listen(port, '127.0.0.1', () => {
+      activeServer = server;
       log.info(`Starcho API running at http://127.0.0.1:${port}`);
       resolve(port);
     });
     server.on('error', reject);
+  });
+}
+
+function stopServer() {
+  return new Promise((resolve) => {
+    if (!activeServer) {
+      closeDatabase();
+      return resolve();
+    }
+    activeServer.close(() => {
+      activeServer = null;
+      closeDatabase();
+      resolve();
+    });
   });
 }
 
@@ -77,4 +114,4 @@ function findPort(start) {
   });
 }
 
-module.exports = { startServer };
+module.exports = { startServer, stopServer };

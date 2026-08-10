@@ -1,5 +1,12 @@
 # Changelog — Starcho JS
 
+## Próxima versión
+
+- Copias de seguridad SQLite desde Settings mediante IPC seguro.
+- Suite de calidad ampliada para autenticación, perfil, avatar, preferencias y seguridad HTTP.
+- Comando portable `npm run check` para validar la sintaxis JavaScript.
+- Pipeline CI con pruebas, auditoría npm, CodeQL y Dependabot.
+
 ## 2.0.0 — 2026-08-10
 
 - Renombrado del producto a Starcho JS.

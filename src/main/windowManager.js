@@ -2,8 +2,9 @@
 
 const { BrowserWindow, screen, shell } = require('electron');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const log = require('electron-log');
-const { IS_PROD, IS_DEV, DEVTOOLS } = require('./env');
+const { IS_DEV, DEVTOOLS } = require('./env');
 
 let mainWindow = null;
 
@@ -12,7 +13,9 @@ function webPreferences() {
     preload: path.join(__dirname, '..', '..', 'preload.js'),
     contextIsolation: true,
     nodeIntegration: false,
-    sandbox: IS_PROD,
+    // Keep the renderer sandboxed in development and production. The preload
+    // exposes the small, explicit API the UI needs.
+    sandbox: true,
     webSecurity: true,
     allowRunningInsecureContent: false,
     devTools: IS_DEV,
@@ -21,17 +24,22 @@ function webPreferences() {
 
 function lockDown(win) {
   const contents = win.webContents;
+  const allowedDocument = pathToFileURL(path.join(__dirname, '..', 'renderer', 'index.html')).href;
+  const isAllowedDocument = (url) => url === allowedDocument || url.startsWith(`${allowedDocument}#`);
   contents.on('will-navigate', (event, url) => {
-    if (!url.startsWith('file://')) event.preventDefault();
+    if (!isAllowedDocument(url)) event.preventDefault();
   });
   contents.setWindowOpenHandler(({ url }) => {
     if (IS_DEV && url.startsWith('chrome-devtools://')) return { action: 'allow' };
-    if (url.startsWith('https://') || url.startsWith('http://')) shell.openExternal(url);
+    // Only HTTPS links may leave the application. HTTP and custom protocols
+    // are rejected so a renderer injection cannot launch arbitrary handlers.
+    if (url.startsWith('https://')) shell.openExternal(url);
     return { action: 'deny' };
   });
   contents.on('will-redirect', (event, url) => {
-    if (!url.startsWith('file://') && !url.startsWith('http://127.0.0.1')) event.preventDefault();
+    if (!isAllowedDocument(url)) event.preventDefault();
   });
+  contents.on('will-attach-webview', (event) => event.preventDefault());
 }
 
 function createWindow() {
@@ -62,7 +70,7 @@ function createWindow() {
   mainWindow.on('maximize', () => mainWindow.webContents.send('window:maximized', true));
   mainWindow.on('unmaximize', () => mainWindow.webContents.send('window:maximized', false));
   mainWindow.on('closed', () => { mainWindow = null; });
-  log.info(`Main window created [sandbox=${IS_PROD}, devTools=${IS_DEV}]`);
+  log.info(`Main window created [sandbox=true, devTools=${IS_DEV}]`);
   return mainWindow;
 }
 

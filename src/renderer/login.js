@@ -50,6 +50,7 @@
     },
   };
   var loginLang = localStorage.getItem('starcho_language') === 'en' ? 'en' : 'es';
+  var LOGIN_SKINS = ['dark', 'light', 'ocean', 'neon', 'pink', 'red', 'matrix', 'arcade', 'military', 'kick', 'winamp', 'rickmorty'];
 
   function loginText(key) { return LOGIN_TEXT[loginLang][key] || LOGIN_TEXT.es[key] || key; }
   function persistLoginSetting(key, value) {
@@ -60,13 +61,13 @@
     }).catch(function () { /* localStorage remains the fallback */ });
   }
   function applyLoginTheme(theme, persist) {
-    var selected = theme === 'light' ? 'light' : 'dark';
+    var selected = LOGIN_SKINS.indexOf(theme) >= 0 ? theme : 'dark';
     document.documentElement.setAttribute('data-theme', selected);
     localStorage.setItem('starcho_theme', selected);
     var icon = document.getElementById('lp-theme-icon');
     var label = document.getElementById('lp-theme-label');
     if (icon) icon.textContent = selected === 'light' ? '☀️' : '🌙';
-    if (label) label.textContent = selected === 'light' ? loginText('theme_light') : loginText('theme_dark');
+    if (label) label.textContent = selected === 'light' ? loginText('theme_light') : (selected === 'dark' ? loginText('theme_dark') : selected);
     if (persist) persistLoginSetting('theme', selected);
   }
   function applyLoginLanguage(lang, persist) {
@@ -79,12 +80,15 @@
     document.querySelectorAll('[data-lp-lang]').forEach(function (el) { el.classList.toggle('active', el.getAttribute('data-lp-lang') === loginLang); });
     var theme = document.documentElement.getAttribute('data-theme') || 'dark';
     var label = document.getElementById('lp-theme-label');
-    if (label) label.textContent = theme === 'light' ? loginText('theme_light') : loginText('theme_dark');
+    if (label) label.textContent = theme === 'light' ? loginText('theme_light') : (theme === 'dark' ? loginText('theme_dark') : theme);
     if (persist) persistLoginSetting('language', loginLang);
   }
   function initLoginPreferences() {
-    var savedTheme = localStorage.getItem('starcho_theme') === 'light' ? 'light' : 'dark';
+    var storedTheme = localStorage.getItem('starcho_theme');
+    var savedTheme = LOGIN_SKINS.indexOf(storedTheme) >= 0 ? storedTheme : 'dark';
     applyLoginTheme(savedTheme, false);
+    var savedLoginTheme = localStorage.getItem('starcho_login_theme');
+    if (savedLoginTheme) loginPg.setAttribute('data-ltheme', savedLoginTheme);
     applyLoginLanguage(loginLang, false);
     document.getElementById('lp-theme-toggle')?.addEventListener('click', function () {
       applyLoginTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light', true);
@@ -165,45 +169,69 @@
   wireToggle('lp-toggle-pw',  'lp-password',  'lp-eye-icon');
   wireToggle('reg-toggle-pw', 'reg-password', 'reg-eye-icon');
 
+  function fallbackSession() {
+    try { return JSON.parse(localStorage.getItem('auth_session') || 'null'); } catch (_) { return null; }
+  }
+  function readStoredSession() {
+    if (!window.electronAPI?.getAuthSession) return Promise.resolve(fallbackSession());
+    return window.electronAPI.getAuthSession().then(function (session) { return session || fallbackSession(); }).catch(function () { return fallbackSession(); });
+  }
+  function saveStoredSession(session) {
+    localStorage.removeItem('auth_session');
+    if (!window.electronAPI?.setAuthSession) {
+      localStorage.setItem('auth_session', JSON.stringify(session));
+      return Promise.resolve(true);
+    }
+    return window.electronAPI.setAuthSession(session).then(function (saved) {
+      if (!saved) localStorage.setItem('auth_session', JSON.stringify(session));
+      return saved;
+    }).catch(function () {
+      localStorage.setItem('auth_session', JSON.stringify(session));
+      return false;
+    });
+  }
+  function clearStoredSession() {
+    localStorage.removeItem('auth_session');
+    return window.electronAPI?.clearAuthSession ? window.electronAPI.clearAuthSession().catch(function () {}) : Promise.resolve();
+  }
+
   // ── Auto-login via stored session token (7-day, no password stored) ─────────
   // Migrate old auth_remember (stored plaintext password) → remove it on first run
   localStorage.removeItem('auth_remember');
 
-  var storedSession = null;
-  try { storedSession = JSON.parse(localStorage.getItem('auth_session') || 'null'); } catch (_) {}
-
-  // Discard client-side if expiry already passed (server is authoritative, but avoids a round-trip)
-  if (storedSession && storedSession.expiresAt && Date.now() > storedSession.expiresAt) {
-    localStorage.removeItem('auth_session');
-    storedSession = null;
-  }
-
-  if (storedSession && storedSession.token) {
+  readStoredSession().then(function (storedSession) {
+    if (storedSession && storedSession.expiresAt && Date.now() > storedSession.expiresAt) {
+      return clearStoredSession().then(function () { return null; });
+    }
+    return storedSession;
+  }).then(function (storedSession) {
+    if (!storedSession || !storedSession.token) {
+      document.getElementById('lp-username').focus();
+      return;
+    }
     loginPg.style.opacity = '0';
-
     getPort().then(function (port) {
-      return fetch('http://127.0.0.1:' + port + '/api/auth/validate?token=' + encodeURIComponent(storedSession.token));
+      return fetch('http://127.0.0.1:' + port + '/api/auth/validate', {
+        headers: { Authorization: 'Bearer ' + storedSession.token },
+      });
     }).then(function (res) {
       return res.json().then(function (data) { return { ok: res.ok, data: data }; });
     }).then(function (r) {
       if (r.ok) {
+        window.__starchoSessionToken = storedSession.token;
         window.dispatchEvent(new CustomEvent('user:login', { detail: r.data }));
         enter();
       } else {
-        // Token expired or invalid — force re-login
-        localStorage.removeItem('auth_session');
+        clearStoredSession();
         loginPg.style.opacity = '';
         document.getElementById('lp-username').focus();
       }
     }).catch(function () {
-      // Server not ready yet — keep the session and show the form so user can retry
       loginPg.style.opacity = '';
       if (storedSession.username) document.getElementById('lp-username').value = storedSession.username;
       document.getElementById('lp-password').focus();
     });
-  } else {
-    document.getElementById('lp-username').focus();
-  }
+  });
 
   // ── API helper ───────────────────────────────────────────────────────────
   var _port = null;
@@ -263,23 +291,23 @@
       })
       .then(function (r) {
         if (r.ok) {
-          // Store session token (never the password) — always saved so the
-          // app can validate on next restart without re-entering credentials.
-          // "Remember me" controls whether to keep it for 7 days or just this session.
-          if (rememberCk.checked && r.data.token) {
-            localStorage.setItem('auth_session', JSON.stringify({
+          // Store only the session token, never the password. Prefer the
+          // operating system secure store and fall back only when unavailable.
+          var session = {
               token:      r.data.token,
               username:   r.data.username || user,
               expiresAt:  r.data.expiresAt,
-            }));
-          } else {
-            // Not remembered — clear any previous session so next launch shows login
-            localStorage.removeItem('auth_session');
-          }
-          loginBtn.innerHTML = makeSvg('<polyline points="20 6 9 17 4 12"/>') + ' ' + loginText('welcome');
-          loginBtn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
-          window.dispatchEvent(new CustomEvent('user:login', { detail: r.data }));
-          setTimeout(enter, 500);
+            };
+          window.__starchoSessionToken = r.data.token || null;
+          var sessionTask = rememberCk.checked && r.data.token
+            ? saveStoredSession(session)
+            : clearStoredSession();
+          sessionTask.then(function () {
+            loginBtn.innerHTML = makeSvg('<polyline points="20 6 9 17 4 12"/>') + ' ' + loginText('welcome');
+            loginBtn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+            window.dispatchEvent(new CustomEvent('user:login', { detail: r.data }));
+            setTimeout(enter, 500);
+          });
         } else {
           resetBtn(loginBtn, SVG_LOGIN, loginText('login_button'));
           showError(loginErrEl, r.data.error || loginText('invalid_credentials'));

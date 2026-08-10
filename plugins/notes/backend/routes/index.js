@@ -14,10 +14,10 @@ function userId(db, username) {
 router.get('/', validate(NoteQuerySchema, 'query'), (req, res) => {
   try {
     const db  = req.db;
-    const uid = userId(db, req.query.username);
+    const uid = userId(db, req.auth?.username);
     const rows = uid
-      ? db.prepare('SELECT * FROM notes WHERE user_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC').all(uid)
-      : db.prepare('SELECT * FROM notes WHERE deleted_at IS NULL ORDER BY updated_at DESC').all();
+      ? db.prepare('SELECT * FROM notes WHERE (user_id = ? OR user_id IS NULL) AND deleted_at IS NULL ORDER BY updated_at DESC').all(uid)
+      : [];
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -25,7 +25,8 @@ router.get('/', validate(NoteQuerySchema, 'query'), (req, res) => {
 // GET /api/notes/:id
 router.get('/:id', validate(IdParamsSchema, 'params'), (req, res) => {
   try {
-    const row = req.db.prepare('SELECT * FROM notes WHERE id = ? AND deleted_at IS NULL').get(req.params.id);
+    const uid = userId(req.db, req.auth?.username);
+    const row = req.db.prepare('SELECT * FROM notes WHERE id = ? AND (user_id = ? OR user_id IS NULL) AND deleted_at IS NULL').get(req.params.id, uid);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -35,8 +36,8 @@ router.get('/:id', validate(IdParamsSchema, 'params'), (req, res) => {
 router.post('/', validate(NoteCreateSchema), (req, res) => {
   try {
     const db  = req.db;
-    const { title, content, color, important_date, username } = req.body;
-    const uid = userId(db, username);
+    const { title, content, color, important_date } = req.body;
+    const uid = userId(db, req.auth?.username);
     const info = db.prepare(
       'INSERT INTO notes (title, content, color, important_date, user_id) VALUES (?, ?, ?, ?, ?)'
     ).run(title, content || null, color || '#6366f1', important_date || null, uid);
@@ -49,10 +50,11 @@ router.put('/:id', validate(IdParamsSchema, 'params'), validate(NoteUpdateSchema
   try {
     const db = req.db;
     const { title, content, color, important_date } = req.body;
+    const uid = userId(db, req.auth?.username);
     db.prepare(
-      'UPDATE notes SET title=?, content=?, color=?, important_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL'
-    ).run(title, content || null, color || '#6366f1', important_date || null, req.params.id);
-    const row = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id);
+      'UPDATE notes SET user_id=COALESCE(user_id, ?), title=?, content=?, color=?, important_date=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND (user_id=? OR user_id IS NULL) AND deleted_at IS NULL'
+    ).run(uid, title, content || null, color || '#6366f1', important_date || null, req.params.id, uid);
+    const row = db.prepare('SELECT * FROM notes WHERE id = ? AND (user_id = ? OR user_id IS NULL)').get(req.params.id, uid);
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -61,7 +63,8 @@ router.put('/:id', validate(IdParamsSchema, 'params'), validate(NoteUpdateSchema
 // DELETE /api/notes/:id  (soft delete)
 router.delete('/:id', validate(IdParamsSchema, 'params'), (req, res) => {
   try {
-    req.db.prepare('UPDATE notes SET deleted_at=CURRENT_TIMESTAMP WHERE id=?').run(req.params.id);
+    const uid = userId(req.db, req.auth?.username);
+    req.db.prepare('UPDATE notes SET deleted_at=CURRENT_TIMESTAMP WHERE id=? AND (user_id=? OR user_id IS NULL)').run(req.params.id, uid);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

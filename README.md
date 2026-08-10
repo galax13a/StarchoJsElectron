@@ -11,6 +11,7 @@ Starcho JS es una aplicación de notas de escritorio, rápida y local, construid
 - Perfil de usuario y ajustes de aplicación.
 - Tema claro y oscuro.
 - Interfaz en Español e Inglés.
+- Copias de seguridad SQLite desde Settings.
 - Arquitectura modular con el plugin oficial de notas.
 - Sin reproductor de YouTube, música, descargas multimedia ni biblioteca de medios.
 
@@ -30,6 +31,24 @@ npm run rebuild
 ```
 
 `better-sqlite3` debe reconstruirse para la versión de Electron instalada. El comando `rebuild` realiza ese proceso automáticamente.
+
+## Pruebas y auditoría
+
+```bash
+npm run check
+npm test
+npm audit --omit=dev --audit-level=high
+```
+
+`npm run check` valida la sintaxis de todos los archivos JavaScript del proyecto. Las pruebas usan bases de datos temporales y cubren el hash de contraseñas, sesiones bearer, aislamiento de notas por usuario, perfil, avatar, preferencias, cabeceras de seguridad y operaciones CRUD. No se utiliza la base de datos personal del usuario durante `npm test`.
+
+Para ejecutar la misma validación que CI:
+
+```bash
+npm run ci
+```
+
+GitHub Actions ejecuta automáticamente sintaxis, pruebas y auditoría en cada push o pull request. CodeQL analiza el código JavaScript y Dependabot revisa semanalmente las dependencias npm.
 
 ## Ejecutar en desarrollo
 
@@ -55,10 +74,13 @@ Comandos específicos por plataforma:
 
 ```bash
 npm run build:win
+npm run build:linux
 npm run build:mac
 ```
 
-Los artefactos se generan en `dist/`.
+Los artefactos se generan en `dist/`. Los builds locales se generan sin firma para permitir pruebas; Windows mostrará la advertencia de editor desconocido hasta configurar un certificado de firma.
+
+El build local de macOS requiere macOS para producir un artefacto confiable. Para generar los tres sistemas automáticamente, crea una etiqueta `v*` en GitHub; el workflow de release usa runners nativos de Windows, Ubuntu y macOS. Los instaladores generados sin certificados son aptos para pruebas, pero para distribución pública deben firmarse y, en macOS, notarizarse.
 
 ## Scripts disponibles
 
@@ -66,9 +88,12 @@ Los artefactos se generan en `dist/`.
 | --- | --- |
 | `npm start` | Inicia la aplicación Electron |
 | `npm run dev` | Inicia Electron en modo desarrollo |
+| `npm run check` | Valida la sintaxis JavaScript |
+| `npm run ci` | Ejecuta validaciones, pruebas y auditoría |
 | `npm run rebuild` | Reconstruye dependencias nativas para Electron |
 | `npm run build` | Genera el instalador de la plataforma actual |
 | `npm run build:win` | Genera el instalador para Windows |
+| `npm run build:linux` | Genera AppImage y DEB para Linux |
 | `npm run build:mac` | Genera el instalador para macOS |
 
 ## Estructura del proyecto
@@ -91,7 +116,13 @@ La base de datos se guarda en:
 %APPDATA%/StarchoJS/starcho-js.db
 ```
 
+Desde **Settings → Datos y respaldo** puedes crear una copia SQLite mediante el diálogo nativo de Electron. Guarda el archivo en un lugar seguro y no lo publiques: contiene tus notas, preferencias y datos de usuario.
+
 Los datos permanecen en el equipo del usuario. El proyecto no incluye `node_modules` ni `dist` en el código fuente publicado; deben generarse localmente con npm.
+
+Para el panel administrativo, define `ADMIN_EMAIL` y `ADMIN_PASSWORD` en `.env`. En producción no se aceptan credenciales administrativas implícitas.
+
+La ventana Electron usa aislamiento de contexto, integración Node deshabilitada, sandbox, CSP, navegación limitada y un preload con una API IPC explícita. Las sesiones se guardan cifradas con `safeStorage` cuando el almacén seguro del sistema está disponible.
 
 ## Dependencias principales
 

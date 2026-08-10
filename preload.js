@@ -9,9 +9,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App info
   getVersion: () => ipcRenderer.invoke('app:get-version'),
   getPaths:   () => ipcRenderer.invoke('app:get-paths'),
+  createBackup: () => ipcRenderer.invoke('data:create-backup'),
 
   // App restart
   restart: () => ipcRenderer.send('app:restart'),
+
+  // Encrypted auth session (falls back to a short-lived in-memory/local
+  // session only when the operating system key store is unavailable).
+  getAuthSession:    () => ipcRenderer.invoke('auth:get-session'),
+  setAuthSession:    (session) => ipcRenderer.invoke('auth:set-session', session),
+  clearAuthSession:  () => ipcRenderer.invoke('auth:clear-session'),
 
   // Window controls
   minimize: () => ipcRenderer.send('window:minimize'),

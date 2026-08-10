@@ -6,14 +6,14 @@ const crypto = require('crypto');
 const router = require('express').Router();
 const { getDb } = require('../database/connection');
 const { validate } = require('../middleware/validate');
-const { LoginSchema, RegisterSchema, ProfileQuerySchema, ProfileUpdateSchema } = require('../schemas/auth');
-
-function hashPw(pw) {
-  return crypto.createHash('sha256').update(pw + 'starcho-local-salt').digest('hex');
-}
+const { LoginSchema, RegisterSchema, ProfileUpdateSchema } = require('../schemas/auth');
+const { hashPassword, verifyPassword, isLegacyHash } = require('../auth/passwords');
 
 // ── App session store (SQLite-backed, 7-day tokens) ───────────────────────────
 const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const loginAttempts = new Map();
 
 function createAppSession(username) {
   const db        = getDb();
@@ -36,22 +36,59 @@ function destroyAppSession(token) {
   try { getDb().prepare('DELETE FROM app_sessions WHERE token = ?').run(token); } catch (_) {}
 }
 
+function bearerToken(req) {
+  const header = req.get('authorization') || '';
+  const match = header.match(/^Bearer\s+([A-Za-z0-9]+)$/i);
+  return match ? match[1] : null;
+}
+
+function requireAppSession(req, res, next) {
+  const token = bearerToken(req);
+  const username = validateAppSession(token);
+  if (!username) return res.status(401).json({ error: 'Sesión requerida o expirada' });
+  req.auth = { token, username };
+  res.set('Cache-Control', 'no-store');
+  next();
+}
+
+function loginRate(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+  if (!record || now - record.startedAt >= LOGIN_WINDOW_MS) {
+    const fresh = { startedAt: now, count: 0 };
+    loginAttempts.set(ip, fresh);
+    return fresh;
+  }
+  return record;
+}
+
 function ensureDefaultUser(db) {
   const u = process.env.APP_USER     || 'admin';
   const p = process.env.APP_PASSWORD || 'admin123';
-  db.prepare('INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)').run(u, hashPw(p));
+  db.prepare('INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)').run(u, hashPassword(p));
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 router.post('/auth/login', validate(LoginSchema), (req, res) => {
   const { username, password } = req.body;
+  const attempt = loginRate(req.ip || '127.0.0.1');
+  res.set('Cache-Control', 'no-store');
+  if (attempt.count >= LOGIN_MAX_ATTEMPTS) {
+    return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
+  }
   try {
     const db = getDb();
     ensureDefaultUser(db);
     const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-    if (!user || user.password !== hashPw(password))
+    if (!user || !verifyPassword(password, user.password)) {
+      attempt.count += 1;
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
+    if (isLegacyHash(user.password)) {
+      db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashPassword(password), user.id);
+    }
+    loginAttempts.delete(req.ip || '127.0.0.1');
     const { token, expiresAt } = createAppSession(user.username);
     res.json({ ok: true, username: user.username, token, expiresAt });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -59,8 +96,9 @@ router.post('/auth/login', validate(LoginSchema), (req, res) => {
 
 // Validates a session token — called on app startup when a stored session exists
 router.get('/auth/validate', (req, res) => {
-  const token    = req.query.token;
+  const token    = bearerToken(req);
   const username = validateAppSession(token);
+  res.set('Cache-Control', 'no-store');
   if (!username) return res.status(401).json({ error: 'Sesión expirada o inválida' });
   try {
     const db   = getDb();
@@ -76,13 +114,13 @@ router.post('/auth/register', validate(RegisterSchema), (req, res) => {
     const db = getDb();
     if (db.prepare('SELECT id FROM users WHERE username = ?').get(username))
       return res.status(409).json({ error: 'Ese usuario ya existe' });
-    db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hashPw(password));
+    db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hashPassword(password));
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.get('/auth/profile', validate(ProfileQuerySchema, 'query'), (req, res) => {
-  const { username } = req.query;
+router.get('/auth/profile', requireAppSession, (req, res) => {
+  const username = req.auth.username;
   try {
     const db   = getDb();
     const user = db.prepare('SELECT username, full_name, nickname, whatsapp, avatar FROM users WHERE username = ?').get(username);
@@ -91,8 +129,9 @@ router.get('/auth/profile', validate(ProfileQuerySchema, 'query'), (req, res) =>
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-router.put('/auth/profile', validate(ProfileUpdateSchema), (req, res) => {
+router.put('/auth/profile', requireAppSession, validate(ProfileUpdateSchema), (req, res) => {
   const { username, full_name, nickname, whatsapp, avatar } = req.body;
+  if (username !== req.auth.username) return res.status(403).json({ error: 'No puedes modificar otro usuario' });
   try {
     const db = getDb();
     db.prepare('UPDATE users SET full_name=?, nickname=?, whatsapp=?, avatar=? WHERE username=?')
@@ -100,6 +139,9 @@ router.put('/auth/profile', validate(ProfileUpdateSchema), (req, res) => {
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// Everything outside the public auth endpoints requires the bearer session.
+router.use(requireAppSession);
 
 // ── App config ────────────────────────────────────────────────────────────────
 

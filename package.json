@@ -1,6 +1,7 @@
 {
   "name": "starcho-js",
   "productName": "Starcho JS",
+  "desktopName": "starcho-js",
   "version": "2.0.0",
   "description": "Aplicación de notas de escritorio construida con Electron, Express 5 y SQLite.",
   "main": "main.js",
@@ -10,8 +11,12 @@
   "scripts": {
     "start": "electron .",
     "dev": "cross-env NODE_ENV=development electron .",
+    "test": "node --test",
+    "check": "node scripts/verify.mjs",
+    "ci": "npm run check && npm test && npm audit --omit=dev --audit-level=high",
     "build": "electron-builder",
-    "build:win": "electron-builder --win",
+    "build:win": "electron-builder --win --config.win.signExecutable=false",
+    "build:linux": "electron-builder --linux",
     "build:mac": "electron-builder --mac",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "electron-builder install-app-deps"
@@ -45,8 +50,7 @@
           ]
         }
       ],
-      "icon": "assets/icons/icon.png",
-      "publisherName": "Starcho JS"
+      "icon": "assets/icons/icon.png"
     },
     "mac": {
       "target": [
@@ -57,9 +61,10 @@
           "target": "zip"
         }
       ],
-      "icon": "assets/icons/icon.icns",
+      "icon": "assets/icons/icon.png",
       "category": "public.app-category.productivity",
-      "darkModeSupport": true
+      "darkModeSupport": true,
+      "identity": null
     },
     "linux": {
       "target": [
@@ -67,7 +72,8 @@
         "deb"
       ],
       "icon": "assets/icons/icon.png",
-      "category": "Office"
+      "category": "Office",
+      "syncDesktopName": true
     },
     "nsis": {
       "oneClick": false,
@@ -87,7 +93,7 @@
     "publish": {
       "provider": "github",
       "owner": "galax13a",
-      "repo": "StarchoJS",
+      "repo": "StarchoJsElectron",
       "releaseType": "release"
     }
   },

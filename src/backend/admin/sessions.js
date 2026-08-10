@@ -9,8 +9,8 @@
  *  • Login rate limiting: 5 failed attempts per IP → 15-minute lockout.
  *  • Sessions expire after 24 h. Cleared on app restart (expected for a local app).
  *
- * Admin credentials (root@starcho.com / 123456x) are hardcoded here and are
- * completely separate from the application user table.
+ * Admin credentials come from ADMIN_EMAIL and ADMIN_PASSWORD. Development
+ * defaults keep the local admin panel usable; production must configure both.
  */
 
 const crypto = require('crypto');
@@ -18,8 +18,9 @@ const log    = require('electron-log');
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const ADMIN_EMAIL    = 'root@starcho.com';
-const ADMIN_PASSWORD = '123456x';
+const IS_PRODUCTION  = process.env.NODE_ENV === 'production';
+const ADMIN_EMAIL    = process.env.ADMIN_EMAIL || (IS_PRODUCTION ? '' : 'root@starcho.com');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (IS_PRODUCTION ? '' : '123456x');
 const COOKIE_NAME    = 'starcho_admin';
 const MAX_AGE_MS     = 7 * 24 * 60 * 60 * 1000; // 7-day session lifetime
 
@@ -81,7 +82,10 @@ function validateCsrf(sessionToken, bodyToken) {
 
 /** Returns true when email + password match the admin credentials. */
 function checkCredentials(email, password) {
-  return email === ADMIN_EMAIL && password === ADMIN_PASSWORD;
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD || email !== ADMIN_EMAIL || typeof password !== 'string') return false;
+  const supplied = Buffer.from(password);
+  const expected = Buffer.from(ADMIN_PASSWORD);
+  return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
 }
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────

@@ -7,7 +7,11 @@ import { initRouter } from './router.js';
 import { initSidebar } from './components/Sidebar.js';
 import { initModal, showToast } from './components/Modal.js';
 
+let booted = false;
+
 async function boot() {
+  if (booted) return;
+  booted = true;
   initErrorHandler();
 
   if (window.electronAPI) {
@@ -72,13 +76,14 @@ function wireKeyboard() {
 
 window.addEventListener('user:login', async (e) => {
   store.setState({ loggedUser: e.detail });
-  await store.loadUserProfile();
-  const lastView = (() => { try { return localStorage.getItem('last_view'); } catch (_) { return null; } })();
-  store.navigate(lastView === 'notes:list' ? lastView : 'home');
-});
-
-boot().catch((err) => {
-  logError(err);
-  console.error('Starcho JS boot failed:', err);
-  showToast(err.message || 'No se pudo iniciar Starcho JS', 'error');
+  try {
+    await boot();
+    await store.loadUserProfile();
+    const lastView = (() => { try { return localStorage.getItem('last_view'); } catch (_) { return null; } })();
+    store.navigate(lastView === 'notes:list' ? lastView : 'home');
+  } catch (err) {
+    logError(err);
+    console.error('Starcho JS login bootstrap failed:', err);
+    showToast(err.message || 'No se pudo iniciar Starcho JS', 'error');
+  }
 });

@@ -2,8 +2,25 @@ let BASE = 'http://127.0.0.1:3847';
 
 function setBase(url) { BASE = url; }
 
+async function getSessionToken() {
+  if (window.__starchoSessionToken) return window.__starchoSessionToken;
+  try {
+    if (window.electronAPI?.getAuthSession) {
+      const secureSession = await window.electronAPI.getAuthSession();
+      if (secureSession?.token) return secureSession.token;
+    }
+  } catch (_) {}
+  try {
+    const localSession = JSON.parse(localStorage.getItem('auth_session') || 'null');
+    return localSession?.token || null;
+  } catch (_) { return null; }
+}
+
 async function request(method, path, body) {
-  const options = { method, headers: { 'Content-Type': 'application/json' } };
+  const headers = { 'Content-Type': 'application/json' };
+  const token = await getSessionToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const options = { method, headers };
   if (body !== undefined) options.body = JSON.stringify(body);
   const response = await fetch(`${BASE}/api${path}`, options);
   const data = await response.json().catch(() => ({}));

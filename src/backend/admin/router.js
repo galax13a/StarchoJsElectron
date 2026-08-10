@@ -25,11 +25,11 @@
  */
 
 const router  = require('express').Router();
-const crypto  = require('crypto');
 const fs      = require('fs');
 const path    = require('path');
 const log     = require('electron-log');
 const { getDb } = require('../database/connection');
+const { hashPassword } = require('../auth/passwords');
 
 const {
   checkCredentials,
@@ -62,10 +62,6 @@ const ENV_PATH  = path.join(__dirname, '..', '..', '..', '.env');
 const QUICK_KEYS = ['theme', 'language', 'volume', 'repeat', 'shuffle', 'titlebar_theme'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function hashPw(pw) {
-  return crypto.createHash('sha256').update(pw + 'starcho-local-salt').digest('hex');
-}
 
 function readFlash(req) {
   const { ok, err } = req.query;
@@ -318,7 +314,7 @@ router.post('/users/create', (req, res) => {
     if (password.length < 6) return flashErr(res, '/admin/users', 'La contraseña debe tener mínimo 6 caracteres');
     if (db.prepare('SELECT id FROM users WHERE username = ?').get(username))
       return flashErr(res, '/admin/users', `El usuario "${username}" ya existe`);
-    db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hashPw(password));
+    db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run(username, hashPassword(password));
     log.info(`Admin: user "${username}" created`);
     flashOk(res, '/admin/users', `Usuario "${username}" creado`);
   } catch (err) {
@@ -375,7 +371,7 @@ router.post('/users/reset-password', (req, res) => {
     const user     = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
     if (!user) return flashErr(res, '/admin/users', `Usuario "${username}" no encontrado`);
     const tempPw = 'Reset_' + username.slice(0, 6);
-    db.prepare('UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(hashPw(tempPw), user.id);
+    db.prepare('UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(hashPassword(tempPw), user.id);
     log.info(`Admin: password reset for "${username}"`);
     flashOk(res, '/admin/users', `Contraseña de "${username}" reseteada → temporal: ${tempPw}`);
   } catch (err) {

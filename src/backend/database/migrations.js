@@ -1,11 +1,7 @@
 'use strict';
 
-const crypto = require('crypto');
 const log    = require('electron-log');
-
-function hashPw(pw) {
-  return crypto.createHash('sha256').update(pw + 'starcho-local-salt').digest('hex');
-}
+const { hashPassword } = require('../auth/passwords');
 
 function runMigrations(db) {
   db.exec(`
@@ -87,7 +83,7 @@ function runMigrations(db) {
 
   // Seed demo user
   db.prepare('INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)')
-    .run('demo@starcho.com', hashPw('123456'));
+    .run('demo@starcho.com', hashPassword('123456'));
 
   log.info('Core database migrations complete');
 }

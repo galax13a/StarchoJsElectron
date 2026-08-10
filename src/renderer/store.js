@@ -1,6 +1,8 @@
 import EventBus from './utils/eventBus.js';
 import API from './utils/api.js';
-import { setLang } from './utils/i18n.js';
+import { setLang, THEMES } from './utils/i18n.js';
+
+const THEME_IDS = new Set(THEMES.map((theme) => theme.id));
 
 const store = {
   state: {
@@ -32,7 +34,7 @@ const store = {
     this.setState({ settings });
     const savedTheme = localStorage.getItem('starcho_theme');
     const savedLanguage = localStorage.getItem('starcho_language');
-    const theme = savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : (settings.theme === 'light' ? 'light' : 'dark');
+    const theme = THEME_IDS.has(savedTheme) ? savedTheme : (THEME_IDS.has(settings.theme) ? settings.theme : 'dark');
     const language = savedLanguage === 'en' || savedLanguage === 'es' ? savedLanguage : settings.language;
     this.applyTheme(theme, false);
     if (language) setLang(language);
@@ -53,7 +55,7 @@ const store = {
   },
 
   applyTheme(theme, persist = true) {
-    const selected = theme === 'light' ? 'light' : 'dark';
+    const selected = THEME_IDS.has(theme) ? theme : 'dark';
     document.documentElement.setAttribute('data-theme', selected);
     localStorage.setItem('starcho_theme', selected);
     this.setState({ theme: selected });

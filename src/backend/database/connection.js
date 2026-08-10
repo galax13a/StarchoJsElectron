@@ -21,4 +21,9 @@ function getDb() {
   return db;
 }
 
-module.exports = { initDatabase, getDb };
+function closeDatabase() {
+  if (!db) return;
+  try { db.close(); } finally { db = null; }
+}
+
+module.exports = { initDatabase, getDb, closeDatabase };
